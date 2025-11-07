@@ -254,7 +254,7 @@ class DCFCalculator {
         
         // Find optimal renting option (minimum NPV - least negative, i.e., lowest cost)
         const optimalRenting = rentingResults.reduce((min, current) => 
-            current.npv < min.npv ? current : min
+            current.npv > min.npv ? current : min
         );
         
         // Calculate difference (both NPVs are negative, so positive difference means renting is better)
