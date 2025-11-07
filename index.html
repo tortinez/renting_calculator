@@ -87,32 +87,11 @@
                 <details class="accordion" open>
                     <summary>📋 Contratos Renting</summary>
                     <div class="accordion-content">
-                        <div class="renting-contract">
-                            <h4>Renting 10k km/año</h4>
-                            <div class="form-group">
-                                <label for="rent10kFee">Cuota mensual (sin IVA):</label>
-                                <input type="number" id="rent10kFee" value="326" min="0" step="10">
-                                <span class="unit">€</span>
-                            </div>
-                            <div class="form-group">
-                                <label for="rent10kPenalty">Penalización km:</label>
-                                <input type="number" id="rent10kPenalty" value="0.035" min="0" max="1" step="0.001">
-                                <span class="unit">€/km</span>
-                            </div>
-                        </div>
-                        <div class="renting-contract">
-                            <h4>Renting 15k km/año</h4>
-                            <div class="form-group">
-                                <label for="rent15kFee">Cuota mensual (sin IVA):</label>
-                                <input type="number" id="rent15kFee" value="345" min="0" step="10">
-                                <span class="unit">€</span>
-                            </div>
-                            <div class="form-group">
-                                <label for="rent15kPenalty">Penalización km:</label>
-                                <input type="number" id="rent15kPenalty" value="0.035" min="0" max="1" step="0.001">
-                                <span class="unit">€/km</span>
-                            </div>
-                        </div>
+                        <div id="rentingContracts" class="renting-contracts"></div>
+                        <button id="addContractBtn" class="btn-secondary contract-add-btn">+ Añadir contrato</button>
+                        <p class="help-text">
+                            Ajusta etiqueta, cuota, km incluidos y penalizaciones para tantos contratos como necesites.
+                        </p>
                     </div>
                 </details>
 
@@ -178,29 +157,32 @@
                 </div>
 
                 <div id="summaryTab" class="tab-content active">
-                    <div class="kpis-grid">
+                    <div class="npc-explanation">
+                        <p><strong>ℹ️ Sobre el Coste Presente Neto (CPN):</strong> El CPN representa el coste total de todos los pagos futuros, traídos a valor presente. Se muestra como valor positivo para facilitar la comparación: <strong>menor CPN = opción más económica</strong>.</p>
+                    </div>
+                    <div class="kpis-grid primary-kpis">
                         <div class="kpi-card purchase">
                             <h3>Comprar</h3>
                             <div class="kpi-value" id="npvPurchase">—</div>
-                            <div class="kpi-label">VPN (€)</div>
-                        </div>
-                        <div class="kpi-card renting optimal" id="optimalCard">
-                            <h3 id="optimalTitle">Renting Óptimo</h3>
-                            <div class="kpi-value" id="npvOptimal">—</div>
-                            <div class="kpi-label">VPN (€)</div>
-                            <div class="penalty-info" id="penaltyInfo"></div>
+                            <div class="kpi-label">CPN (€)</div>
                         </div>
                         <div class="kpi-card difference">
                             <h3>Diferencia</h3>
                             <div class="kpi-value" id="difference">—</div>
-                            <div class="kpi-label">Renting - Compra (€)</div>
+                            <div class="kpi-label">Ahorro de Renting vs Compra (€)</div>
                         </div>
                     </div>
+
+                    <div class="kpi-section-header">
+                        <h3>Contratos de renting evaluados</h3>
+                        <span class="kpi-hint">El mejor aparece resaltado</span>
+                    </div>
+                    <div class="kpis-grid renting-kpi-grid" id="rentingKpiGrid"></div>
 
                     <div class="recommendation" id="recommendation"></div>
 
                     <div class="chart-container">
-                        <h3>Comparación VPN por Opción</h3>
+                        <h3>Comparación CPN por Opción</h3>
                         <canvas id="npvChart"></canvas>
                     </div>
 
@@ -224,7 +206,7 @@
                 </div>
 
                 <div id="meshTab" class="tab-content">
-                    <h3>Malla: Diferencia VPN (Meses × Km/año)</h3>
+                    <h3>Malla: Ahorro de Renting vs Compra (Meses × Km/año)</h3>
                     <div class="chart-container">
                         <canvas id="meshChart"></canvas>
                     </div>
