@@ -365,7 +365,17 @@ class UIController {
         this.showDetailsTable(results);
     }
 
-    // Helper method to draw y-axis with labels and grid lines
+    /**
+     * Helper method to draw y-axis with labels and grid lines
+     * @param {CanvasRenderingContext2D} ctx - The canvas context
+     * @param {number} minValue - Minimum value for the axis
+     * @param {number} maxValue - Maximum value for the axis
+     * @param {number} x - X coordinate for the axis line
+     * @param {number} yStart - Y coordinate for the top of the axis
+     * @param {number} yEnd - Y coordinate for the bottom of the axis
+     * @param {number} numTicks - Number of tick marks (default: 5)
+     * @param {function} labelFormatter - Optional custom formatter for labels (default: currency)
+     */
     drawYAxis(ctx, minValue, maxValue, x, yStart, yEnd, numTicks = 5, labelFormatter = null) {
         const range = maxValue - minValue;
         const tickInterval = range / numTicks;
@@ -412,7 +422,12 @@ class UIController {
         }
     }
 
-    // Helper method to add hover tooltips to canvas
+    /**
+     * Helper method to add hover tooltips to canvas elements
+     * @param {HTMLCanvasElement} canvas - The canvas element
+     * @param {Array} dataPoints - Array of objects containing {x, y, width, height, data}
+     * @param {function} getTooltipText - Callback function that takes data object and returns HTML string
+     */
     addCanvasTooltip(canvas, dataPoints, getTooltipText) {
         const tooltip = document.createElement('div');
         tooltip.style.position = 'absolute';
