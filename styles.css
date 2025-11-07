@@ -475,20 +475,29 @@ body {
 /* Charts */
 .chart-container {
     background: #f8f9fa;
-    padding: 20px;
+    padding: 30px;
     border-radius: 10px;
-    margin-bottom: 25px;
+    margin-bottom: 30px;
 }
 
 .chart-container h3 {
     color: var(--primary-color);
-    margin-bottom: 15px;
+    margin-bottom: 20px;
     text-align: center;
+    font-size: 1.3em;
 }
 
 canvas {
     max-width: 100%;
-    height: auto !important;
+    min-height: 450px !important;
+}
+
+#breakevenChart {
+    min-height: 500px !important;
+}
+
+#meshChart {
+    min-height: 600px !important;
 }
 
 /* Breakeven Info */

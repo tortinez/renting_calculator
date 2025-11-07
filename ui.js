@@ -4,7 +4,8 @@ class UIController {
     constructor() {
         this.calculator = window.calculator;
         this.currentInputs = this.getDefaultInputs();
-        this.hoveredChartData = null;
+        // Store chart instances for cleanup
+        this.chartInstances = {};
         this.initializeUI();
         this.attachEventListeners();
         this.loadFromLocalStorage();
@@ -365,123 +366,13 @@ class UIController {
         this.showDetailsTable(results);
     }
 
-    /**
-     * Helper method to draw y-axis with labels and grid lines
-     * @param {CanvasRenderingContext2D} ctx - The canvas context
-     * @param {number} minValue - Minimum value for the axis
-     * @param {number} maxValue - Maximum value for the axis
-     * @param {number} x - X coordinate for the axis line
-     * @param {number} yStart - Y coordinate for the top of the axis
-     * @param {number} yEnd - Y coordinate for the bottom of the axis
-     * @param {number} numTicks - Number of tick marks (default: 5)
-     * @param {function} labelFormatter - Optional custom formatter for labels (default: currency)
-     */
-    drawYAxis(ctx, minValue, maxValue, x, yStart, yEnd, numTicks = 5, labelFormatter = null) {
-        const range = maxValue - minValue;
-        const tickInterval = range / numTicks;
-        
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, yStart);
-        ctx.lineTo(x, yEnd);
-        ctx.stroke();
-        
-        ctx.fillStyle = '#333';
-        ctx.font = '11px Arial';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        
-        for (let i = 0; i <= numTicks; i++) {
-            const value = minValue + (i * tickInterval);
-            const y = yEnd - (i * tickInterval / range) * (yEnd - yStart);
-            
-            // Tick mark
-            ctx.beginPath();
-            ctx.moveTo(x - 5, y);
-            ctx.lineTo(x, y);
-            ctx.stroke();
-            
-            // Label - use custom formatter if provided, otherwise default to currency
-            const label = labelFormatter ? labelFormatter(value) : this.calculator.formatCurrency(value);
-            ctx.fillText(label, x - 10, y);
-            
-            // Grid line
-            if (i > 0 && i < numTicks) {
-                ctx.strokeStyle = '#e0e0e0';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([3, 3]);
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.lineTo(ctx.canvas.width - 40, y);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 2;
-            }
-        }
-    }
-
-    /**
-     * Helper method to add hover tooltips to canvas elements
-     * @param {HTMLCanvasElement} canvas - The canvas element
-     * @param {Array} dataPoints - Array of objects containing {x, y, width, height, data}
-     * @param {function} getTooltipText - Callback function that takes data object and returns HTML string
-     */
-    addCanvasTooltip(canvas, dataPoints, getTooltipText) {
-        const tooltip = document.createElement('div');
-        tooltip.style.position = 'absolute';
-        tooltip.style.background = 'rgba(0, 0, 0, 0.8)';
-        tooltip.style.color = 'white';
-        tooltip.style.padding = '8px 12px';
-        tooltip.style.borderRadius = '4px';
-        tooltip.style.pointerEvents = 'none';
-        tooltip.style.display = 'none';
-        tooltip.style.zIndex = '1000';
-        tooltip.style.fontSize = '12px';
-        tooltip.style.whiteSpace = 'nowrap';
-        canvas.parentElement.appendChild(tooltip);
-        
-        canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            let found = false;
-            for (const point of dataPoints) {
-                if (x >= point.x && x <= point.x + point.width && 
-                    y >= point.y && y <= point.y + point.height) {
-                    tooltip.innerHTML = getTooltipText(point.data);
-                    tooltip.style.display = 'block';
-                    tooltip.style.left = (e.clientX + 10) + 'px';
-                    tooltip.style.top = (e.clientY - 10) + 'px';
-                    found = true;
-                    break;
-                }
-            }
-            
-            if (!found) {
-                tooltip.style.display = 'none';
-            }
-        });
-        
-        canvas.addEventListener('mouseleave', () => {
-            tooltip.style.display = 'none';
-        });
-    }
-
     drawNPVChart(results) {
         const canvas = document.getElementById('npvChart');
-        const ctx = canvas.getContext('2d');
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 300;
-        
-        const width = canvas.width;
-        const height = canvas.height;
-        const padding = { left: 100, right: 40, top: 40, bottom: 60 };
-        
-        ctx.clearRect(0, 0, width, height);
+        // Destroy existing chart if it exists
+        if (this.chartInstances.npvChart) {
+            this.chartInstances.npvChart.destroy();
+        }
         
         const data = [
             { label: 'Comprar', value: results.purchase.npv, color: '#f5576c' },
@@ -492,97 +383,102 @@ class UIController {
             }))
         ];
         
-        const values = data.map(d => d.value);
-        const minValue = Math.min(...values, 0);
-        const maxValue = Math.max(...values, 0);
-        const range = maxValue - minValue;
-        
-        const barWidth = (width - padding.left - padding.right) / (data.length * 1.8);
-        const plotHeight = height - padding.top - padding.bottom;
-        
-        // Draw Y axis with labels
-        this.drawYAxis(ctx, minValue, maxValue, padding.left, padding.top, height - padding.bottom);
-        
-        // Y axis title
-        ctx.save();
-        ctx.translate(20, height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('VPN (€)', 0, 0);
-        ctx.restore();
-        
-        // Zero line
-        const zeroY = height - padding.bottom - ((-minValue) / range) * plotHeight;
-        ctx.strokeStyle = '#999';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, zeroY);
-        ctx.lineTo(width - padding.right, zeroY);
-        ctx.stroke();
-        
-        // Draw bars
-        const dataPoints = [];
-        data.forEach((d, i) => {
-            const x = padding.left + (i + 0.5) * ((width - padding.left - padding.right) / data.length);
-            const barX = x - barWidth / 2;
-            const barValue = d.value - minValue;
-            const barHeight = (barValue / range) * plotHeight;
-            const barY = height - padding.bottom - barHeight;
-            
-            // Bar
-            ctx.fillStyle = d.color;
-            ctx.fillRect(barX, barY, barWidth, barHeight);
-            
-            // Border
-            ctx.strokeStyle = d.color;
-            ctx.lineWidth = 2;
-            ctx.strokeRect(barX, barY, barWidth, barHeight);
-            
-            // X Label
-            ctx.fillStyle = '#333';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(d.label, x, height - padding.bottom + 20);
-            
-            // Value on top of bar
-            ctx.font = 'bold 11px Arial';
-            ctx.fillText(this.calculator.formatCurrency(d.value), x, barY - 5);
-            
-            dataPoints.push({
-                x: barX,
-                y: barY,
-                width: barWidth,
-                height: barHeight,
-                data: d
-            });
-        });
-        
-        // X axis title
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Opción', width / 2, height - 10);
-        
-        // Add tooltips
-        this.addCanvasTooltip(canvas, dataPoints, (d) => {
-            return `<strong>${d.label}</strong><br>VPN: ${this.calculator.formatCurrency(d.value)}`;
+        this.chartInstances.npvChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: data.map(d => d.label),
+                datasets: [{
+                    label: 'VPN',
+                    data: data.map(d => d.value),
+                    backgroundColor: data.map(d => d.color),
+                    borderColor: data.map(d => d.color),
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: (context) => {
+                                return `VPN: ${this.calculator.formatCurrency(context.parsed.y)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'VPN (€)',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            callback: function(value) {
+                                return new Intl.NumberFormat('es-ES', {
+                                    style: 'currency',
+                                    currency: 'EUR',
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                }).format(value);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Opción',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
         });
     }
 
     drawAnnualChart(results) {
         const canvas = document.getElementById('annualChart');
-        const ctx = canvas.getContext('2d');
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 300;
-        
-        const width = canvas.width;
-        const height = canvas.height;
-        const padding = { left: 100, right: 40, top: 60, bottom: 60 };
-        
-        ctx.clearRect(0, 0, width, height);
+        // Destroy existing chart if it exists
+        if (this.chartInstances.annualChart) {
+            this.chartInstances.annualChart.destroy();
+        }
         
         // Group cash flows by year
         const years = Math.ceil(this.currentInputs.months / 12);
@@ -611,114 +507,135 @@ class UIController {
         // Add initial purchase cost to year 0
         purchaseAnnual[0] += Math.abs(results.purchase.cashFlows[0].amount);
         
-        const maxCost = Math.max(...purchaseAnnual, ...rentingAnnual);
-        const plotWidth = width - padding.left - padding.right;
-        const plotHeight = height - padding.top - padding.bottom;
-        const xStep = plotWidth / years;
+        const labels = Array.from({ length: years }, (_, i) => `Año ${i + 1}`);
         
-        // Draw Y axis with labels
-        this.drawYAxis(ctx, 0, maxCost * 1.1, padding.left, padding.top, height - padding.bottom);
-        
-        // Y axis title
-        ctx.save();
-        ctx.translate(20, height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Coste Anual (€)', 0, 0);
-        ctx.restore();
-        
-        // Draw axes
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, height - padding.bottom);
-        ctx.lineTo(width - padding.right, height - padding.bottom);
-        ctx.stroke();
-        
-        // Draw purchase line
-        ctx.strokeStyle = '#f5576c';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        purchaseAnnual.forEach((cost, i) => {
-            const x = padding.left + (i + 0.5) * xStep;
-            const y = height - padding.bottom - (cost / (maxCost * 1.1)) * plotHeight;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-            
-            // Point
-            ctx.save();
-            ctx.fillStyle = '#f5576c';
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
+        this.chartInstances.annualChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Compra',
+                    data: purchaseAnnual,
+                    borderColor: '#f5576c',
+                    backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                    borderWidth: 4,
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    pointBackgroundColor: '#f5576c',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2
+                }, {
+                    label: 'Renting',
+                    data: rentingAnnual,
+                    borderColor: '#4facfe',
+                    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+                    borderWidth: 4,
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    pointBackgroundColor: '#4facfe',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: (context) => {
+                                return `${context.dataset.label}: ${this.calculator.formatCurrency(context.parsed.y)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Coste Anual (€)',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            callback: function(value) {
+                                return new Intl.NumberFormat('es-ES', {
+                                    style: 'currency',
+                                    currency: 'EUR',
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                }).format(value);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Año',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
         });
-        ctx.stroke();
-        
-        // Draw renting line
-        ctx.strokeStyle = '#4facfe';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        rentingAnnual.forEach((cost, i) => {
-            const x = padding.left + (i + 0.5) * xStep;
-            const y = height - padding.bottom - (cost / (maxCost * 1.1)) * plotHeight;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-            
-            // Point
-            ctx.save();
-            ctx.fillStyle = '#4facfe';
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        });
-        ctx.stroke();
-        
-        // X labels
-        ctx.fillStyle = '#333';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        for (let i = 0; i < years; i++) {
-            const x = padding.left + (i + 0.5) * xStep;
-            ctx.fillText(`Año ${i + 1}`, x, height - padding.bottom + 20);
-        }
-        
-        // X axis title
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText('Año', width / 2, height - 10);
-        
-        // Legend
-        const legendX = width - padding.right - 150;
-        const legendY = padding.top;
-        
-        ctx.fillStyle = '#f5576c';
-        ctx.fillRect(legendX, legendY, 20, 3);
-        ctx.fillStyle = '#333';
-        ctx.font = '13px Arial';
-        ctx.textAlign = 'left';
-        ctx.fillText('Compra', legendX + 30, legendY + 5);
-        
-        ctx.fillStyle = '#4facfe';
-        ctx.fillRect(legendX, legendY + 20, 20, 3);
-        ctx.fillStyle = '#333';
-        ctx.fillText('Renting', legendX + 30, legendY + 25);
     }
 
     drawWeeklyChart(results) {
         const canvas = document.getElementById('weeklyChart');
-        const ctx = canvas.getContext('2d');
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 300;
-        
-        const width = canvas.width;
-        const height = canvas.height;
-        const padding = { left: 80, right: 40, top: 40, bottom: 60 };
-        
-        ctx.clearRect(0, 0, width, height);
+        // Destroy existing chart if it exists
+        if (this.chartInstances.weeklyChart) {
+            this.chartInstances.weeklyChart.destroy();
+        }
         
         const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
         const dayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -728,81 +645,87 @@ class UIController {
             );
         });
         
-        const maxKm = Math.max(...dayKm, 1);
-        const plotWidth = width - padding.left - padding.right;
-        const plotHeight = height - padding.top - padding.bottom;
-        const barWidth = plotWidth / (days.length * 1.8);
-        const yMax = maxKm * 1.15;
-        
-        // Draw Y axis with labels using helper method with km formatter
-        this.drawYAxis(ctx, 0, yMax, padding.left, padding.top, height - padding.bottom, 5, 
-            (value) => Math.round(value) + ' km'
-        );
-        
-        // Y axis title
-        ctx.save();
-        ctx.translate(20, height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Kilómetros', 0, 0);
-        ctx.restore();
-        
-        // Draw X axis
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, height - padding.bottom);
-        ctx.lineTo(width - padding.right, height - padding.bottom);
-        ctx.stroke();
-        
-        // Draw bars
-        const dataPoints = [];
-        dayKm.forEach((km, i) => {
-            const x = padding.left + (i + 0.5) * (plotWidth / days.length);
-            const barX = x - barWidth / 2;
-            const barHeight = (km / yMax) * plotHeight;
-            const barY = height - padding.bottom - barHeight;
-            
-            ctx.fillStyle = '#667eea';
-            ctx.fillRect(barX, barY, barWidth, barHeight);
-            
-            // Border
-            ctx.strokeStyle = '#667eea';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(barX, barY, barWidth, barHeight);
-            
-            // X Label
-            ctx.fillStyle = '#333';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(days[i], x, height - padding.bottom + 20);
-            
-            // Value on top of bar
-            if (km > 0) {
-                ctx.font = 'bold 11px Arial';
-                ctx.fillText(`${Math.round(km)}`, x, barY - 5);
+        this.chartInstances.weeklyChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: days,
+                datasets: [{
+                    label: 'Kilómetros',
+                    data: dayKm,
+                    backgroundColor: '#667eea',
+                    borderColor: '#667eea',
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: (context) => {
+                                return `${context.parsed.y} km`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Kilómetros',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            callback: function(value) {
+                                return value + ' km';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Día de la Semana',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
             }
-            
-            dataPoints.push({
-                x: barX,
-                y: barY,
-                width: barWidth,
-                height: barHeight,
-                data: { label: days[i], value: km }
-            });
-        });
-        
-        // X axis title
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Día de la Semana', width / 2, height - 10);
-        
-        // Add tooltips
-        this.addCanvasTooltip(canvas, dataPoints, (d) => {
-            return `<strong>${d.label}</strong><br>${Math.round(d.value)} km`;
         });
     }
 
@@ -823,105 +746,125 @@ class UIController {
 
     drawBreakevenChart(curve) {
         const canvas = document.getElementById('breakevenChart');
-        const ctx = canvas.getContext('2d');
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 400;
-        
-        const width = canvas.width;
-        const height = canvas.height;
-        const padding = { left: 100, right: 40, top: 40, bottom: 70 };
-        
-        ctx.clearRect(0, 0, width, height);
-        
-        const diffs = curve.map(c => c.difference);
-        const minDiff = Math.min(...diffs);
-        const maxDiff = Math.max(...diffs);
-        const range = maxDiff - minDiff;
-        
-        const plotWidth = width - padding.left - padding.right;
-        const plotHeight = height - padding.top - padding.bottom;
-        const xScale = plotWidth / curve.length;
-        
-        // Draw Y axis with labels
-        this.drawYAxis(ctx, minDiff, maxDiff, padding.left, padding.top, height - padding.bottom, 6);
-        
-        // Y axis title
-        ctx.save();
-        ctx.translate(20, height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Diferencia VPN (Renting - Compra) €', 0, 0);
-        ctx.restore();
-        
-        // Draw X axis
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, height - padding.bottom);
-        ctx.lineTo(width - padding.right, height - padding.bottom);
-        ctx.stroke();
-        
-        // Draw zero line (horizontal)
-        const zeroY = height - padding.bottom - ((-minDiff) / range) * plotHeight;
-        ctx.strokeStyle = '#999';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        ctx.moveTo(padding.left, zeroY);
-        ctx.lineTo(width - padding.right, zeroY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // Draw curve with filled area
-        ctx.strokeStyle = '#667eea';
-        ctx.fillStyle = 'rgba(102, 126, 234, 0.2)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        
-        curve.forEach((point, i) => {
-            const x = padding.left + i * xScale;
-            const y = height - padding.bottom - ((point.difference - minDiff) / range) * plotHeight;
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        });
-        ctx.stroke();
-        
-        // Fill area under curve
-        ctx.lineTo(width - padding.right, height - padding.bottom);
-        ctx.lineTo(padding.left, height - padding.bottom);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Add points on the line
-        curve.forEach((point, i) => {
-            if (i % 10 === 0 || i === curve.length - 1) {
-                const x = padding.left + i * xScale;
-                const y = height - padding.bottom - ((point.difference - minDiff) / range) * plotHeight;
-                ctx.fillStyle = '#667eea';
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        });
-        
-        // X labels
-        ctx.fillStyle = '#333';
-        ctx.font = '11px Arial';
-        ctx.textAlign = 'center';
-        for (let i = 0; i < curve.length; i += 10) {
-            const x = padding.left + i * xScale;
-            ctx.fillText(curve[i].months, x, height - padding.bottom + 20);
+        // Destroy existing chart if it exists
+        if (this.chartInstances.breakevenChart) {
+            this.chartInstances.breakevenChart.destroy();
         }
         
-        // X axis title
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText('Meses', width / 2, height - 10);
+        this.chartInstances.breakevenChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: curve.map(c => c.months),
+                datasets: [{
+                    label: 'Diferencia VPN (Renting - Compra)',
+                    data: curve.map(c => c.difference),
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                    borderWidth: 4,
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 0,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#667eea',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            title: (context) => {
+                                return `${context[0].label} meses (${(context[0].label / 12).toFixed(1)} años)`;
+                            },
+                            label: (context) => {
+                                return `Diferencia: ${this.calculator.formatCurrency(context.parsed.y)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Diferencia VPN (Renting - Compra) €',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            callback: function(value) {
+                                return new Intl.NumberFormat('es-ES', {
+                                    style: 'currency',
+                                    currency: 'EUR',
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                }).format(value);
+                            }
+                        },
+                        grid: {
+                            color: (context) => {
+                                return context.tick.value === 0 ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.05)';
+                            },
+                            lineWidth: (context) => {
+                                return context.tick.value === 0 ? 2 : 1;
+                            }
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Meses',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            maxTicksLimit: 12
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
     }
 
     generateMesh() {
