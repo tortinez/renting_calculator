@@ -1,3 +1,14 @@
+:root {
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -6,62 +17,99 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--bg-gradient);
     min-height: 100vh;
-    padding: 20px;
     color: #333;
 }
 
-.container {
-    max-width: 1200px;
+.app-container {
+    max-width: 1600px;
     margin: 0 auto;
+    padding: 20px;
 }
 
-header {
+.app-header {
     text-align: center;
     color: white;
     margin-bottom: 30px;
 }
 
-header h1 {
+.app-header h1 {
     font-size: 2.5em;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
 }
 
-.subtitle {
-    font-size: 1.2em;
+.version {
     opacity: 0.9;
+    font-size: 0.9em;
 }
 
-.input-section {
+.main-layout {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 20px;
+}
+
+/* Input Panel */
+.inputs-panel {
     background: white;
     border-radius: 15px;
-    padding: 30px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    margin-bottom: 30px;
-}
-
-.section-card {
-    margin-bottom: 30px;
     padding: 20px;
-    background: #f8f9fa;
-    border-radius: 10px;
-    border-left: 4px solid #667eea;
+    box-shadow: var(--shadow-lg);
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
 }
 
-.section-card h2 {
-    color: #667eea;
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 20px;
-    font-size: 1.5em;
 }
 
-.section-card h3 {
-    color: #764ba2;
+.panel-header h2 {
+    color: var(--primary-color);
+    font-size: 1.3em;
+}
+
+/* Accordion */
+.accordion {
+    background: #f8f9fa;
+    border-radius: 8px;
     margin-bottom: 15px;
-    font-size: 1.2em;
+    border: 1px solid #e0e0e0;
 }
 
+.accordion summary {
+    padding: 12px 15px;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--primary-color);
+    list-style: none;
+    user-select: none;
+}
+
+.accordion summary::-webkit-details-marker {
+    display: none;
+}
+
+.accordion summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 8px;
+    transition: transform 0.3s;
+}
+
+.accordion[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.accordion-content {
+    padding: 0 15px 15px 15px;
+}
+
+/* Form Groups */
 .form-group {
     margin-bottom: 15px;
 }
@@ -71,132 +119,344 @@ header h1 {
     font-weight: 600;
     margin-bottom: 5px;
     color: #555;
+    font-size: 0.9em;
 }
 
-.form-group input {
-    width: 100%;
-    padding: 10px;
+.form-group input[type="number"],
+.form-group input[type="text"] {
+    width: calc(100% - 30px);
+    padding: 8px;
     border: 2px solid #e0e0e0;
     border-radius: 5px;
-    font-size: 1em;
-    transition: border-color 0.3s;
+    font-size: 0.95em;
 }
 
-.form-group input:focus {
-    outline: none;
-    border-color: #667eea;
+.form-group input[type="range"] {
+    width: calc(100% - 50px);
+    margin-right: 10px;
+}
+
+.form-group .unit {
+    margin-left: 5px;
+    color: #777;
+    font-size: 0.9em;
+}
+
+.range-value {
+    display: inline-block;
+    min-width: 40px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--primary-color);
 }
 
 .help-text {
     display: block;
-    font-size: 0.85em;
+    font-size: 0.8em;
     color: #777;
     margin-top: 3px;
 }
 
-.renting-options {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-}
-
-.renting-option {
-    padding: 15px;
+/* Renting Contract */
+.renting-contract {
     background: white;
-    border-radius: 8px;
-    border: 2px solid #e0e0e0;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    border-left: 3px solid var(--primary-color);
 }
 
-.calculate-btn {
+.renting-contract h4 {
+    color: var(--secondary-color);
+    margin-bottom: 10px;
+    font-size: 0.95em;
+}
+
+/* Residual Table */
+.residual-table {
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.residual-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.residual-row:last-child {
+    border-bottom: none;
+}
+
+/* Weekly Planner */
+.weekly-planner {
+    font-size: 0.85em;
+}
+
+.day-planner {
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+}
+
+.day-header {
+    font-weight: 600;
+    color: var(--secondary-color);
+    margin-bottom: 5px;
+}
+
+.trip-entry {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 5px;
+    margin-bottom: 5px;
+    align-items: center;
+}
+
+.trip-entry input {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
+.btn-remove {
+    background: var(--danger-color);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+}
+
+.btn-add-trip {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+    margin-top: 5px;
+}
+
+.km-summary {
+    background: var(--primary-color);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+    font-weight: 600;
+    margin-top: 10px;
+}
+
+/* One-off Trips */
+.one-off-trips {
+    font-size: 0.85em;
+}
+
+.one-off-entry {
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+}
+
+.one-off-entry input {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 0.85em;
+    margin-bottom: 5px;
+}
+
+/* Custom Weeks */
+.custom-weeks {
+    font-size: 0.85em;
+}
+
+.custom-week-entry {
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+}
+
+.custom-week-entry input {
+    width: 100%;
+    padding: 4px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 0.85em;
+    margin-bottom: 5px;
+}
+
+/* Annual KM Display */
+.km-annual-display {
+    background: var(--bg-gradient);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.km-annual-display h3 {
+    font-size: 1.2em;
+}
+
+/* Buttons */
+.btn-primary {
     width: 100%;
     padding: 15px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--bg-gradient);
     color: white;
     border: none;
     border-radius: 8px;
-    font-size: 1.2em;
+    font-size: 1.1em;
     font-weight: 600;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.calculate-btn:hover {
+.btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    box-shadow: var(--shadow-lg);
 }
 
-.calculate-btn:active {
-    transform: translateY(0);
+.btn-secondary {
+    padding: 8px 12px;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
 }
 
-.results-section {
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+/* Results Panel */
+.results-panel {
     background: white;
     border-radius: 15px;
-    padding: 30px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    padding: 25px;
+    box-shadow: var(--shadow-lg);
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
 }
 
-.results-section h2 {
-    color: #667eea;
-    margin-bottom: 25px;
-    text-align: center;
-    font-size: 2em;
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e0e0e0;
 }
 
-.summary-cards {
+.tab {
+    padding: 12px 20px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    cursor: pointer;
+    font-weight: 600;
+    color: #666;
+    transition: all 0.3s;
+}
+
+.tab:hover {
+    color: var(--primary-color);
+}
+
+.tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* KPIs */
+.kpis-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 20px;
     margin-bottom: 30px;
 }
 
-.result-card {
+.kpi-card {
     padding: 20px;
     border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow);
+    color: white;
 }
 
-.result-card.purchase {
+.kpi-card.purchase {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
 }
 
-.result-card.renting {
+.kpi-card.renting {
     background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
 }
 
-.result-card h3 {
-    margin-bottom: 15px;
-    font-size: 1.3em;
+.kpi-card.difference {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
 }
 
-.metric {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.3);
+.kpi-card.optimal {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    animation: pulse 2s ease-in-out infinite;
 }
 
-.metric:last-child {
-    border-bottom: none;
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
 }
 
-.metric .label {
-    font-size: 0.95em;
+.kpi-card h3 {
+    font-size: 1em;
+    margin-bottom: 10px;
     opacity: 0.9;
 }
 
-.metric .value {
-    font-size: 1.3em;
+.kpi-value {
+    font-size: 2em;
     font-weight: 700;
+    margin-bottom: 5px;
 }
 
+.kpi-label {
+    font-size: 0.85em;
+    opacity: 0.9;
+}
+
+.penalty-info {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.3);
+    font-size: 0.85em;
+}
+
+/* Recommendation */
 .recommendation {
     padding: 20px;
     border-radius: 10px;
-    margin-bottom: 30px;
+    margin-bottom: 25px;
     font-size: 1.1em;
     text-align: center;
     font-weight: 600;
@@ -212,78 +472,116 @@ header h1 {
     color: white;
 }
 
-.chart-section {
-    margin-bottom: 30px;
-    padding: 20px;
+/* Charts */
+.chart-container {
     background: #f8f9fa;
+    padding: 20px;
     border-radius: 10px;
+    margin-bottom: 25px;
 }
 
-.chart-section h3 {
-    color: #667eea;
-    margin-bottom: 20px;
+.chart-container h3 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
     text-align: center;
 }
 
-#comparisonChart {
+canvas {
     max-width: 100%;
-    height: 400px;
+    height: auto !important;
 }
 
-.details-section {
-    padding: 20px;
+/* Breakeven Info */
+.breakeven-info {
     background: #f8f9fa;
+    padding: 20px;
     border-radius: 10px;
-}
-
-.details-section h3 {
-    color: #667eea;
     margin-bottom: 20px;
 }
 
-.yearly-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
+.breakeven-info h4 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
 }
 
-.yearly-table th,
-.yearly-table td {
-    padding: 12px;
+/* Export Buttons */
+.export-buttons {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+/* Tables */
+.details-table {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+table th,
+table td {
+    padding: 10px;
     text-align: left;
     border-bottom: 1px solid #e0e0e0;
 }
 
-.yearly-table th {
-    background: #667eea;
+table th {
+    background: var(--primary-color);
     color: white;
     font-weight: 600;
+    position: sticky;
+    top: 0;
 }
 
-.yearly-table tr:last-child td {
-    border-bottom: none;
-}
-
-.yearly-table tr:hover {
+table tr:hover {
     background: #f8f9fa;
 }
 
+/* Responsive */
+@media (max-width: 1024px) {
+    .main-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .inputs-panel,
+    .results-panel {
+        max-height: none;
+    }
+}
+
 @media (max-width: 768px) {
-    header h1 {
+    .app-header h1 {
         font-size: 1.8em;
     }
     
-    .subtitle {
-        font-size: 1em;
-    }
-    
-    .summary-cards {
+    .kpis-grid {
         grid-template-columns: 1fr;
     }
-    
-    .renting-options {
-        grid-template-columns: 1fr;
-    }
+}
+
+/* Scrollbar Styling */
+.inputs-panel::-webkit-scrollbar,
+.results-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.inputs-panel::-webkit-scrollbar-track,
+.results-panel::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.inputs-panel::-webkit-scrollbar-thumb,
+.results-panel::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 10px;
+}
+
+.inputs-panel::-webkit-scrollbar-thumb:hover,
+.results-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary-color);
 }

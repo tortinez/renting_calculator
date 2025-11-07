@@ -3,165 +3,246 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Compra vs Renting de Vehículo</title>
+    <title>Calculadora Renting vs Compra (DCF) v1.3.1</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Calculadora de Compra vs Renting</h1>
-            <p class="subtitle">Análisis con Flujos de Caja Descontados (DCF)</p>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>🚗 Calculadora Renting vs Compra (DCF)</h1>
+            <p class="version">v1.3.1 - Análisis mensual con planificación dinámica</p>
         </header>
 
-        <div class="input-section">
-            <div class="section-card">
-                <h2>Parámetros Generales</h2>
-                <div class="form-group">
-                    <label for="analysisYears">Período de análisis (años):</label>
-                    <input type="number" id="analysisYears" value="5" min="1" max="10">
+        <div class="main-layout">
+            <!-- Left Panel: Inputs -->
+            <aside class="inputs-panel">
+                <div class="panel-header">
+                    <h2>⚙️ Parámetros</h2>
+                    <button id="resetBtn" class="btn-secondary">Restablecer</button>
                 </div>
-                <div class="form-group">
-                    <label for="discountRate">Tasa de descuento (%):</label>
-                    <input type="number" id="discountRate" value="5" min="0" max="20" step="0.1">
-                    <span class="help-text">Coste del dinero</span>
-                </div>
-                <div class="form-group">
-                    <label for="inflationRate">Tasa de inflación (%):</label>
-                    <input type="number" id="inflationRate" value="2" min="0" max="10" step="0.1">
-                </div>
-                <div class="form-group">
-                    <label for="annualKm">Kilómetros anuales estimados:</label>
-                    <input type="number" id="annualKm" value="12000" min="1000" max="50000" step="1000">
-                </div>
-            </div>
 
-            <div class="section-card">
-                <h2>Opción 1: Comprar Vehículo</h2>
-                <div class="form-group">
-                    <label for="purchasePrice">Precio de compra (€):</label>
-                    <input type="number" id="purchasePrice" value="25000" min="0" step="1000">
-                </div>
-                <div class="form-group">
-                    <label for="downPayment">Entrada inicial (€):</label>
-                    <input type="number" id="downPayment" value="5000" min="0" step="1000">
-                </div>
-                <div class="form-group">
-                    <label for="loanInterest">Interés del préstamo (%):</label>
-                    <input type="number" id="loanInterest" value="7" min="0" max="20" step="0.1">
-                </div>
-                <div class="form-group">
-                    <label for="maintenanceCost">Coste mantenimiento anual (€):</label>
-                    <input type="number" id="maintenanceCost" value="800" min="0" step="100">
-                </div>
-                <div class="form-group">
-                    <label for="insuranceCost">Seguro anual (€):</label>
-                    <input type="number" id="insuranceCost" value="600" min="0" step="100">
-                </div>
-                <div class="form-group">
-                    <label for="roadTax">Impuesto de circulación anual (€):</label>
-                    <input type="number" id="roadTax" value="150" min="0" step="10">
-                </div>
-                <div class="form-group">
-                    <label for="resaleValue">Valor de reventa estimado (€):</label>
-                    <input type="number" id="resaleValue" value="12000" min="0" step="1000">
-                </div>
-            </div>
-
-            <div class="section-card">
-                <h2>Opción 2: Renting</h2>
-                <div class="renting-options">
-                    <div class="renting-option">
-                        <h3>Renting 10,000 km/año</h3>
+                <!-- Financial Parameters -->
+                <details class="accordion" open>
+                    <summary>💰 Parámetros Financieros</summary>
+                    <div class="accordion-content">
                         <div class="form-group">
-                            <label for="renting10k">Cuota mensual (€):</label>
-                            <input type="number" id="renting10k" value="350" min="0" step="10">
+                            <label for="months">Duración (meses):</label>
+                            <input type="range" id="months" min="12" max="120" value="72" step="1">
+                            <span class="range-value" id="monthsValue">72</span>
                         </div>
                         <div class="form-group">
-                            <label for="penalty10k">Penalización por km extra (€/km):</label>
-                            <input type="number" id="penalty10k" value="0.15" min="0" max="1" step="0.01">
-                        </div>
-                    </div>
-                    <div class="renting-option">
-                        <h3>Renting 15,000 km/año</h3>
-                        <div class="form-group">
-                            <label for="renting15k">Cuota mensual (€):</label>
-                            <input type="number" id="renting15k" value="420" min="0" step="10">
+                            <label for="discountRate">Tasa descuento nominal (anual):</label>
+                            <input type="number" id="discountRate" value="3" min="0" max="20" step="0.5">
+                            <span class="unit">%</span>
                         </div>
                         <div class="form-group">
-                            <label for="penalty15k">Penalización por km extra (€/km):</label>
-                            <input type="number" id="penalty15k" value="0.12" min="0" max="1" step="0.01">
+                            <label for="inflationRate">Inflación anual:</label>
+                            <input type="number" id="inflationRate" value="2" min="0" max="20" step="0.5">
+                            <span class="unit">%</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="vat">IVA:</label>
+                            <input type="number" id="vat" value="21" min="0" max="30" step="1">
+                            <span class="unit">%</span>
                         </div>
                     </div>
+                </details>
+
+                <!-- Purchase Parameters -->
+                <details class="accordion" open>
+                    <summary>🏪 Opción Compra</summary>
+                    <div class="accordion-content">
+                        <div class="form-group">
+                            <label for="purchasePrice">Precio compra (PVP):</label>
+                            <input type="number" id="purchasePrice" value="33000" min="0" step="1000">
+                            <span class="unit">€</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="ownershipCosts">Costes fijos año 1:</label>
+                            <input type="number" id="ownershipCosts" value="1200" min="0" step="50">
+                            <span class="unit">€</span>
+                            <span class="help-text">Seguro, impuestos, mantenimiento</span>
+                        </div>
+                        <div class="form-group">
+                            <label>Valor residual (% del precio):</label>
+                            <div class="residual-table">
+                                <div class="residual-row">
+                                    <span>Año 0:</span><span>100%</span>
+                                </div>
+                                <div class="residual-row">
+                                    <span>Año 5:</span><span>35%</span>
+                                </div>
+                                <div class="residual-row">
+                                    <span>Año 8:</span><span>25%</span>
+                                </div>
+                                <div class="residual-row">
+                                    <span>Año 10:</span><span>15%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Renting Parameters -->
+                <details class="accordion" open>
+                    <summary>📋 Contratos Renting</summary>
+                    <div class="accordion-content">
+                        <div class="renting-contract">
+                            <h4>Renting 10k km/año</h4>
+                            <div class="form-group">
+                                <label for="rent10kFee">Cuota mensual (sin IVA):</label>
+                                <input type="number" id="rent10kFee" value="326" min="0" step="10">
+                                <span class="unit">€</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="rent10kPenalty">Penalización km:</label>
+                                <input type="number" id="rent10kPenalty" value="0.035" min="0" max="1" step="0.001">
+                                <span class="unit">€/km</span>
+                            </div>
+                        </div>
+                        <div class="renting-contract">
+                            <h4>Renting 15k km/año</h4>
+                            <div class="form-group">
+                                <label for="rent15kFee">Cuota mensual (sin IVA):</label>
+                                <input type="number" id="rent15kFee" value="345" min="0" step="10">
+                                <span class="unit">€</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="rent15kPenalty">Penalización km:</label>
+                                <input type="number" id="rent15kPenalty" value="0.035" min="0" max="1" step="0.001">
+                                <span class="unit">€/km</span>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Fuel -->
+                <details class="accordion">
+                    <summary>⛽ Combustible</summary>
+                    <div class="accordion-content">
+                        <div class="form-group">
+                            <label for="fuelCost">Coste año 1:</label>
+                            <input type="number" id="fuelCost" value="0.104" min="0" max="1" step="0.001">
+                            <span class="unit">€/km</span>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Weekly Planner -->
+                <details class="accordion" open>
+                    <summary>📅 Planificación Semanal</summary>
+                    <div class="accordion-content">
+                        <div id="weeklyPlanner" class="weekly-planner"></div>
+                        <div class="km-summary">
+                            <strong>Km/semana:</strong> <span id="weeklyKm">0</span> km
+                        </div>
+                    </div>
+                </details>
+
+                <!-- One-off Trips -->
+                <details class="accordion">
+                    <summary>✈️ Viajes Puntuales</summary>
+                    <div class="accordion-content">
+                        <div id="oneOffTrips" class="one-off-trips"></div>
+                        <button id="addTripBtn" class="btn-secondary">+ Añadir viaje</button>
+                    </div>
+                </details>
+
+                <!-- Schedule Modifiers -->
+                <details class="accordion">
+                    <summary>📊 Modificadores Calendario</summary>
+                    <div class="accordion-content">
+                        <div class="form-group">
+                            <label for="weeksOff">Semanas sin uso:</label>
+                            <input type="number" id="weeksOff" value="0" min="0" max="20" step="1">
+                        </div>
+                        <div id="customWeeks" class="custom-weeks"></div>
+                        <button id="addCustomWeekBtn" class="btn-secondary">+ Añadir período</button>
+                    </div>
+                </details>
+
+                <div class="km-annual-display">
+                    <h3>📍 Total: <span id="annualKm">0</span> km/año</h3>
                 </div>
-            </div>
 
-            <button id="calculateBtn" class="calculate-btn">Calcular y Comparar</button>
-        </div>
+                <button id="calculateBtn" class="btn-primary">🔄 Calcular y Comparar</button>
+            </aside>
 
-        <div id="results" class="results-section" style="display: none;">
-            <h2>Resultados del Análisis DCF</h2>
-            
-            <div class="summary-cards">
-                <div class="result-card purchase">
-                    <h3>Comprar Vehículo</h3>
-                    <div class="metric">
-                        <span class="label">Valor Presente Neto:</span>
-                        <span class="value" id="npvPurchase">€0</span>
+            <!-- Center Panel: Results -->
+            <main class="results-panel">
+                <div class="tabs">
+                    <button class="tab active" data-tab="summary">📊 Resumen</button>
+                    <button class="tab" data-tab="breakeven">⚖️ Equilibrio</button>
+                    <button class="tab" data-tab="mesh">🗺️ Malla</button>
+                    <button class="tab" data-tab="details">📋 Detalles</button>
+                </div>
+
+                <div id="summaryTab" class="tab-content active">
+                    <div class="kpis-grid">
+                        <div class="kpi-card purchase">
+                            <h3>Comprar</h3>
+                            <div class="kpi-value" id="npvPurchase">—</div>
+                            <div class="kpi-label">VPN (€)</div>
+                        </div>
+                        <div class="kpi-card renting optimal" id="optimalCard">
+                            <h3 id="optimalTitle">Renting Óptimo</h3>
+                            <div class="kpi-value" id="npvOptimal">—</div>
+                            <div class="kpi-label">VPN (€)</div>
+                            <div class="penalty-info" id="penaltyInfo"></div>
+                        </div>
+                        <div class="kpi-card difference">
+                            <h3>Diferencia</h3>
+                            <div class="kpi-value" id="difference">—</div>
+                            <div class="kpi-label">Renting - Compra (€)</div>
+                        </div>
                     </div>
-                    <div class="metric">
-                        <span class="label">Coste Total (nominal):</span>
-                        <span class="value" id="totalPurchase">€0</span>
+
+                    <div class="recommendation" id="recommendation"></div>
+
+                    <div class="chart-container">
+                        <h3>Comparación VPN por Opción</h3>
+                        <canvas id="npvChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Costes Anuales</h3>
+                        <canvas id="annualChart"></canvas>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Desglose Semanal de Km</h3>
+                        <canvas id="weeklyChart"></canvas>
                     </div>
                 </div>
-                
-                <div class="result-card renting">
-                    <h3>Renting 10,000 km/año</h3>
-                    <div class="metric">
-                        <span class="label">Valor Presente Neto:</span>
-                        <span class="value" id="npvRenting10k">€0</span>
-                    </div>
-                    <div class="metric">
-                        <span class="label">Coste Total (nominal):</span>
-                        <span class="value" id="totalRenting10k">€0</span>
-                    </div>
-                    <div class="metric">
-                        <span class="label">Penalización total:</span>
-                        <span class="value" id="penaltyRenting10k">€0</span>
+
+                <div id="breakevenTab" class="tab-content">
+                    <h3>Análisis de Punto de Equilibrio</h3>
+                    <div class="breakeven-info" id="breakevenInfo"></div>
+                    <div class="chart-container">
+                        <canvas id="breakevenChart"></canvas>
                     </div>
                 </div>
-                
-                <div class="result-card renting">
-                    <h3>Renting 15,000 km/año</h3>
-                    <div class="metric">
-                        <span class="label">Valor Presente Neto:</span>
-                        <span class="value" id="npvRenting15k">€0</span>
-                    </div>
-                    <div class="metric">
-                        <span class="label">Coste Total (nominal):</span>
-                        <span class="value" id="totalRenting15k">€0</span>
-                    </div>
-                    <div class="metric">
-                        <span class="label">Penalización total:</span>
-                        <span class="value" id="penaltyRenting15k">€0</span>
+
+                <div id="meshTab" class="tab-content">
+                    <h3>Malla: Diferencia VPN (Meses × Km/año)</h3>
+                    <div class="chart-container">
+                        <canvas id="meshChart"></canvas>
                     </div>
                 </div>
-            </div>
 
-            <div class="recommendation" id="recommendation"></div>
-
-            <div class="chart-section">
-                <h3>Visualización de Comparación</h3>
-                <canvas id="comparisonChart"></canvas>
-            </div>
-
-            <div class="details-section">
-                <h3>Desglose Anual</h3>
-                <div id="yearlyBreakdown"></div>
-            </div>
+                <div id="detailsTab" class="tab-content">
+                    <h3>Tabla Detallada DCF</h3>
+                    <div class="export-buttons">
+                        <button id="exportCSV" class="btn-secondary">📥 Exportar CSV</button>
+                        <button id="exportJSON" class="btn-secondary">📥 Exportar JSON</button>
+                    </div>
+                    <div id="detailsTable"></div>
+                </div>
+            </main>
         </div>
     </div>
 
     <script src="calculator.js"></script>
-    <script src="chart.js"></script>
+    <script src="ui.js"></script>
 </body>
 </html>
