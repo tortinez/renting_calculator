@@ -183,17 +183,23 @@
 
                     <div class="chart-container">
                         <h3>Comparación CPN por Opción</h3>
-                        <canvas id="npvChart"></canvas>
+                        <div class="chart-wrapper">
+                            <canvas id="npvChart"></canvas>
+                        </div>
                     </div>
 
                     <div class="chart-container">
                         <h3>Costes Anuales</h3>
-                        <canvas id="annualChart"></canvas>
+                        <div class="chart-wrapper">
+                            <canvas id="annualChart"></canvas>
+                        </div>
                     </div>
 
                     <div class="chart-container">
                         <h3>Desglose Semanal de Km</h3>
-                        <canvas id="weeklyChart"></canvas>
+                        <div class="chart-wrapper">
+                            <canvas id="weeklyChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -201,14 +207,18 @@
                     <h3>Análisis de Punto de Equilibrio</h3>
                     <div class="breakeven-info" id="breakevenInfo"></div>
                     <div class="chart-container">
-                        <canvas id="breakevenChart"></canvas>
+                        <div class="chart-wrapper chart-wrapper--tall">
+                            <canvas id="breakevenChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
                 <div id="meshTab" class="tab-content">
                     <h3>Malla: Ahorro de Renting vs Compra (Meses × Km/año)</h3>
                     <div class="chart-container">
-                        <canvas id="meshChart"></canvas>
+                        <div class="chart-wrapper chart-wrapper--xl">
+                            <canvas id="meshChart"></canvas>
+                        </div>
                     </div>
                 </div>
 

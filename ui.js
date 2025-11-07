@@ -679,8 +679,8 @@ class UIController {
                 const pCF = results.purchase.cashFlows.find(cf => cf.month === m);
                 const rCF = results.optimal.cashFlows.find(cf => cf.month === m);
                 
-                if (pCF) purchaseTotal += Math.abs(pCF.amount);
-                if (rCF) rentingTotal += Math.abs(rCF.amount);
+                if (pCF) purchaseTotal -= pCF.amount;
+                if (rCF) rentingTotal -= rCF.amount;
             }
             
             purchaseAnnual.push(purchaseTotal);
@@ -688,40 +688,77 @@ class UIController {
         }
         
         // Add initial purchase cost to year 0
-        purchaseAnnual[0] += Math.abs(results.purchase.cashFlows[0].amount);
+        if (results.purchase.cashFlows.length > 0) {
+            purchaseAnnual[0] -= results.purchase.cashFlows[0].amount;
+        }
         
         const labels = Array.from({ length: years }, (_, i) => `Año ${i + 1}`);
+
+        const buildWaterfallSegments = (values) => {
+            const segments = [];
+            let cumulative = 0;
+            values.forEach((delta, idx) => {
+                const start = cumulative;
+                const end = start + delta;
+                const low = Math.min(start, end);
+                const high = Math.max(start, end);
+                segments.push({
+                    x: labels[idx],
+                    y: [low, high],
+                    delta,
+                    start,
+                    end
+                });
+                cumulative = end;
+            });
+            return segments;
+        };
+
+        const purchaseSegments = buildWaterfallSegments(purchaseAnnual);
+        const rentingSegments = buildWaterfallSegments(rentingAnnual);
         
         this.chartInstances.annualChart = new Chart(canvas, {
-            type: 'line',
+            type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
                     label: 'Compra',
-                    data: purchaseAnnual,
-                    borderColor: '#f5576c',
-                    backgroundColor: 'rgba(245, 87, 108, 0.1)',
-                    borderWidth: 4,
-                    tension: 0.3,
-                    fill: true,
-                    pointRadius: 6,
-                    pointHoverRadius: 8,
-                    pointBackgroundColor: '#f5576c',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2
+                    data: purchaseSegments,
+                    parsing: {
+                        xAxisKey: 'x',
+                        yAxisKey: 'y'
+                    },
+                    backgroundColor: (context) => {
+                        const delta = context.raw?.delta || 0;
+                        return delta >= 0 ? '#f5576c' : '#10b981';
+                    },
+                    borderColor: (context) => {
+                        const delta = context.raw?.delta || 0;
+                        return delta >= 0 ? '#f5576c' : '#10b981';
+                    },
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.8,
+                    categoryPercentage: 0.45
                 }, {
                     label: 'Renting',
-                    data: rentingAnnual,
-                    borderColor: '#4facfe',
-                    backgroundColor: 'rgba(79, 172, 254, 0.1)',
-                    borderWidth: 4,
-                    tension: 0.3,
-                    fill: true,
-                    pointRadius: 6,
-                    pointHoverRadius: 8,
-                    pointBackgroundColor: '#4facfe',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2
+                    data: rentingSegments,
+                    parsing: {
+                        xAxisKey: 'x',
+                        yAxisKey: 'y'
+                    },
+                    backgroundColor: (context) => {
+                        const delta = context.raw?.delta || 0;
+                        return delta >= 0 ? '#4facfe' : '#10b981';
+                    },
+                    borderColor: (context) => {
+                        const delta = context.raw?.delta || 0;
+                        return delta >= 0 ? '#4facfe' : '#10b981';
+                    },
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.8,
+                    categoryPercentage: 0.45
                 }]
             },
             options: {
@@ -756,7 +793,14 @@ class UIController {
                         },
                         callbacks: {
                             label: (context) => {
-                                return `${context.dataset.label}: ${this.calculator.formatCurrency(context.parsed.y)}`;
+                                const delta = context.raw?.delta || 0;
+                                const sign = delta >= 0 ? '+' : '−';
+                                return `${context.dataset.label}: ${sign}${this.calculator.formatCurrency(Math.abs(delta))}`;
+                            },
+                            footer: (context) => {
+                                const raw = context[0]?.raw;
+                                if (!raw) return '';
+                                return `Acumulado: ${this.calculator.formatCurrency(raw.end)}`;
                             }
                         }
                     }
@@ -766,7 +810,7 @@ class UIController {
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Coste Anual (€)',
+                            text: 'Coste acumulado (€)',
                             font: {
                                 weight: 'bold',
                                 size: 16
@@ -776,13 +820,8 @@ class UIController {
                             font: {
                                 size: 13
                             },
-                            callback: function(value) {
-                                return new Intl.NumberFormat('es-ES', {
-                                    style: 'currency',
-                                    currency: 'EUR',
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 0
-                                }).format(value);
+                            callback: (value) => {
+                                return this.calculator.formatCurrency(value);
                             }
                         },
                         grid: {
@@ -790,6 +829,7 @@ class UIController {
                         }
                     },
                     x: {
+                        stacked: true,
                         title: {
                             display: true,
                             text: 'Año',
@@ -800,7 +840,8 @@ class UIController {
                         },
                         ticks: {
                             font: {
-                                size: 13
+                                size: 13,
+                                weight: 'bold'
                             }
                         },
                         grid: {
@@ -1072,12 +1113,14 @@ class UIController {
     drawMeshChart(mesh) {
         const canvas = document.getElementById('meshChart');
         const ctx = canvas.getContext('2d');
+
+        const wrapper = canvas.parentElement;
+        const width = (wrapper ? wrapper.clientWidth : canvas.offsetWidth) || 600;
+        const height = (wrapper ? wrapper.clientHeight : 500) || 500;
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 500;
+        canvas.width = width;
+        canvas.height = height;
         
-        const width = canvas.width;
-        const height = canvas.height;
         const padding = 80;
         
         ctx.clearRect(0, 0, width, height);
