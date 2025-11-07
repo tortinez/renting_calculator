@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Compra vs Renting de Vehículo</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Calculadora de Compra vs Renting</h1>
+            <p class="subtitle">Análisis con Flujos de Caja Descontados (DCF)</p>
+        </header>
+
+        <div class="input-section">
+            <div class="section-card">
+                <h2>Parámetros Generales</h2>
+                <div class="form-group">
+                    <label for="analysisYears">Período de análisis (años):</label>
+                    <input type="number" id="analysisYears" value="5" min="1" max="10">
+                </div>
+                <div class="form-group">
+                    <label for="discountRate">Tasa de descuento (%):</label>
+                    <input type="number" id="discountRate" value="5" min="0" max="20" step="0.1">
+                    <span class="help-text">Coste del dinero</span>
+                </div>
+                <div class="form-group">
+                    <label for="inflationRate">Tasa de inflación (%):</label>
+                    <input type="number" id="inflationRate" value="2" min="0" max="10" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="annualKm">Kilómetros anuales estimados:</label>
+                    <input type="number" id="annualKm" value="12000" min="1000" max="50000" step="1000">
+                </div>
+            </div>
+
+            <div class="section-card">
+                <h2>Opción 1: Comprar Vehículo</h2>
+                <div class="form-group">
+                    <label for="purchasePrice">Precio de compra (€):</label>
+                    <input type="number" id="purchasePrice" value="25000" min="0" step="1000">
+                </div>
+                <div class="form-group">
+                    <label for="downPayment">Entrada inicial (€):</label>
+                    <input type="number" id="downPayment" value="5000" min="0" step="1000">
+                </div>
+                <div class="form-group">
+                    <label for="loanInterest">Interés del préstamo (%):</label>
+                    <input type="number" id="loanInterest" value="7" min="0" max="20" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label for="maintenanceCost">Coste mantenimiento anual (€):</label>
+                    <input type="number" id="maintenanceCost" value="800" min="0" step="100">
+                </div>
+                <div class="form-group">
+                    <label for="insuranceCost">Seguro anual (€):</label>
+                    <input type="number" id="insuranceCost" value="600" min="0" step="100">
+                </div>
+                <div class="form-group">
+                    <label for="roadTax">Impuesto de circulación anual (€):</label>
+                    <input type="number" id="roadTax" value="150" min="0" step="10">
+                </div>
+                <div class="form-group">
+                    <label for="resaleValue">Valor de reventa estimado (€):</label>
+                    <input type="number" id="resaleValue" value="12000" min="0" step="1000">
+                </div>
+            </div>
+
+            <div class="section-card">
+                <h2>Opción 2: Renting</h2>
+                <div class="renting-options">
+                    <div class="renting-option">
+                        <h3>Renting 10,000 km/año</h3>
+                        <div class="form-group">
+                            <label for="renting10k">Cuota mensual (€):</label>
+                            <input type="number" id="renting10k" value="350" min="0" step="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="penalty10k">Penalización por km extra (€/km):</label>
+                            <input type="number" id="penalty10k" value="0.15" min="0" max="1" step="0.01">
+                        </div>
+                    </div>
+                    <div class="renting-option">
+                        <h3>Renting 15,000 km/año</h3>
+                        <div class="form-group">
+                            <label for="renting15k">Cuota mensual (€):</label>
+                            <input type="number" id="renting15k" value="420" min="0" step="10">
+                        </div>
+                        <div class="form-group">
+                            <label for="penalty15k">Penalización por km extra (€/km):</label>
+                            <input type="number" id="penalty15k" value="0.12" min="0" max="1" step="0.01">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="calculateBtn" class="calculate-btn">Calcular y Comparar</button>
+        </div>
+
+        <div id="results" class="results-section" style="display: none;">
+            <h2>Resultados del Análisis DCF</h2>
+            
+            <div class="summary-cards">
+                <div class="result-card purchase">
+                    <h3>Comprar Vehículo</h3>
+                    <div class="metric">
+                        <span class="label">Valor Presente Neto:</span>
+                        <span class="value" id="npvPurchase">€0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Coste Total (nominal):</span>
+                        <span class="value" id="totalPurchase">€0</span>
+                    </div>
+                </div>
+                
+                <div class="result-card renting">
+                    <h3>Renting 10,000 km/año</h3>
+                    <div class="metric">
+                        <span class="label">Valor Presente Neto:</span>
+                        <span class="value" id="npvRenting10k">€0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Coste Total (nominal):</span>
+                        <span class="value" id="totalRenting10k">€0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Penalización total:</span>
+                        <span class="value" id="penaltyRenting10k">€0</span>
+                    </div>
+                </div>
+                
+                <div class="result-card renting">
+                    <h3>Renting 15,000 km/año</h3>
+                    <div class="metric">
+                        <span class="label">Valor Presente Neto:</span>
+                        <span class="value" id="npvRenting15k">€0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Coste Total (nominal):</span>
+                        <span class="value" id="totalRenting15k">€0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Penalización total:</span>
+                        <span class="value" id="penaltyRenting15k">€0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="recommendation" id="recommendation"></div>
+
+            <div class="chart-section">
+                <h3>Visualización de Comparación</h3>
+                <canvas id="comparisonChart"></canvas>
+            </div>
+
+            <div class="details-section">
+                <h3>Desglose Anual</h3>
+                <div id="yearlyBreakdown"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="calculator.js"></script>
+    <script src="chart.js"></script>
+</body>
+</html>
