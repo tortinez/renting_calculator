@@ -459,6 +459,21 @@ body {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.npc-explanation {
+    background: linear-gradient(135deg, #667eea15, #764ba215);
+    border-left: 4px solid var(--primary-color);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+
+.npc-explanation p {
+    margin: 0;
+    color: #333;
+}
+
 .kpi-card {
     padding: 20px;
     border-radius: 10px;

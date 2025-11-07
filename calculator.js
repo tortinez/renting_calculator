@@ -252,16 +252,17 @@ class DCFCalculator {
             };
         });
         
-        // Find optimal renting option (minimum NPV)
+        // Find optimal renting option (minimum NPV - least negative, i.e., lowest cost)
         const optimalRenting = rentingResults.reduce((min, current) => 
             current.npv < min.npv ? current : min
         );
         
-        // Calculate difference
+        // Calculate difference (both NPVs are negative, so positive difference means renting is better)
         const difference = optimalRenting.npv - purchaseNPV;
         
         // Determine best overall option
-        const bestOption = difference < 0 ? 'renting' : 'purchase';
+        // Since NPVs are negative (costs), positive difference means renting costs less (is better)
+        const bestOption = difference > 0 ? 'renting' : 'purchase';
         
         this.results = {
             kmPerYear: kmPerYear,
