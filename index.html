@@ -87,32 +87,11 @@
                 <details class="accordion" open>
                     <summary>📋 Contratos Renting</summary>
                     <div class="accordion-content">
-                        <div class="renting-contract">
-                            <h4>Renting 10k km/año</h4>
-                            <div class="form-group">
-                                <label for="rent10kFee">Cuota mensual (sin IVA):</label>
-                                <input type="number" id="rent10kFee" value="326" min="0" step="10">
-                                <span class="unit">€</span>
-                            </div>
-                            <div class="form-group">
-                                <label for="rent10kPenalty">Penalización km:</label>
-                                <input type="number" id="rent10kPenalty" value="0.035" min="0" max="1" step="0.001">
-                                <span class="unit">€/km</span>
-                            </div>
-                        </div>
-                        <div class="renting-contract">
-                            <h4>Renting 15k km/año</h4>
-                            <div class="form-group">
-                                <label for="rent15kFee">Cuota mensual (sin IVA):</label>
-                                <input type="number" id="rent15kFee" value="345" min="0" step="10">
-                                <span class="unit">€</span>
-                            </div>
-                            <div class="form-group">
-                                <label for="rent15kPenalty">Penalización km:</label>
-                                <input type="number" id="rent15kPenalty" value="0.035" min="0" max="1" step="0.001">
-                                <span class="unit">€/km</span>
-                            </div>
-                        </div>
+                        <div id="rentingContracts" class="renting-contracts"></div>
+                        <button id="addContractBtn" class="btn-secondary contract-add-btn">+ Añadir contrato</button>
+                        <p class="help-text">
+                            Ajusta etiqueta, cuota, km incluidos y penalizaciones para tantos contratos como necesites.
+                        </p>
                     </div>
                 </details>
 
@@ -178,17 +157,11 @@
                 </div>
 
                 <div id="summaryTab" class="tab-content active">
-                    <div class="kpis-grid">
+                    <div class="kpis-grid primary-kpis">
                         <div class="kpi-card purchase">
                             <h3>Comprar</h3>
                             <div class="kpi-value" id="npvPurchase">—</div>
                             <div class="kpi-label">VPN (€)</div>
-                        </div>
-                        <div class="kpi-card renting optimal" id="optimalCard">
-                            <h3 id="optimalTitle">Renting Óptimo</h3>
-                            <div class="kpi-value" id="npvOptimal">—</div>
-                            <div class="kpi-label">VPN (€)</div>
-                            <div class="penalty-info" id="penaltyInfo"></div>
                         </div>
                         <div class="kpi-card difference">
                             <h3>Diferencia</h3>
@@ -196,6 +169,12 @@
                             <div class="kpi-label">Renting - Compra (€)</div>
                         </div>
                     </div>
+
+                    <div class="kpi-section-header">
+                        <h3>Contratos de renting evaluados</h3>
+                        <span class="kpi-hint">El mejor aparece resaltado</span>
+                    </div>
+                    <div class="kpis-grid renting-kpi-grid" id="rentingKpiGrid"></div>
 
                     <div class="recommendation" id="recommendation"></div>
 

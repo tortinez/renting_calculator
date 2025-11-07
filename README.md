@@ -21,7 +21,7 @@ python3 -m http.server 8000
 ### Entrada de Datos
 - **Parámetros Financieros**: duración (meses), tasa de descuento, inflación, IVA
 - **Opción Compra**: precio, costes fijos anuales, valor residual
-- **Contratos Renting**: 10k km/año y 15k km/año con cuotas y penalizaciones
+- **Contratos Renting**: define múltiples contratos personalizados (cuota, km/año incluidos, penalización) con presets de 10k y 15k km/año
 - **Combustible**: coste por km con ajuste de inflación
 - **Planificación Semanal**: define viajes diarios (ej: Lunes 1 viaje × 20 km)
 - **Viajes Puntuales**: vacaciones, viajes largos ocasionales

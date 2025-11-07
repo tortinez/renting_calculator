@@ -20,7 +20,7 @@ class UIController {
             ownershipCosts: 1200,
             fuelCost: 0.104,
             residualAnchors: this.calculator.defaults.residualAnchors,
-            contracts: this.calculator.defaults.contracts,
+            contracts: JSON.parse(JSON.stringify(this.calculator.defaults.contracts)),
             weeklyPlan: JSON.parse(JSON.stringify(this.calculator.defaults.weeklyPlan)),
             oneOffTrips: JSON.parse(JSON.stringify(this.calculator.defaults.oneOffTrips)),
             weeksOff: 0,
@@ -29,6 +29,7 @@ class UIController {
     }
 
     initializeUI() {
+        this.renderRentingContracts();
         this.renderWeeklyPlanner();
         this.renderOneOffTrips();
         this.renderCustomWeeks();
@@ -44,10 +45,6 @@ class UIController {
         document.getElementById('purchasePrice').value = this.currentInputs.purchasePrice;
         document.getElementById('ownershipCosts').value = this.currentInputs.ownershipCosts;
         document.getElementById('fuelCost').value = this.currentInputs.fuelCost;
-        document.getElementById('rent10kFee').value = this.currentInputs.contracts[0].monthlyFeeNoVAT;
-        document.getElementById('rent10kPenalty').value = this.currentInputs.contracts[0].penaltyPerKm;
-        document.getElementById('rent15kFee').value = this.currentInputs.contracts[1].monthlyFeeNoVAT;
-        document.getElementById('rent15kPenalty').value = this.currentInputs.contracts[1].penaltyPerKm;
         document.getElementById('weeksOff').value = this.currentInputs.weeksOff;
     }
 
@@ -91,6 +88,11 @@ class UIController {
             this.currentInputs.customWeeks.push({ label: 'Nuevo período', weeks: 1, multiplier: 1.0 });
             this.renderCustomWeeks();
             this.updateAnnualKm();
+        });
+
+        // Add renting contract
+        document.getElementById('addContractBtn').addEventListener('click', () => {
+            this.addRentingContract();
         });
 
         // Input changes for annual km update
@@ -230,6 +232,199 @@ class UIController {
         });
     }
 
+    renderRentingContracts() {
+        const container = document.getElementById('rentingContracts');
+        container.innerHTML = '';
+
+        if (!this.currentInputs.contracts.length) {
+            this.addRentingContract();
+            return;
+        }
+
+        const defaultContracts = this.calculator.defaults.contracts;
+        this.currentInputs.contracts = this.currentInputs.contracts.map((contract, idx) => {
+            const normalized = { ...contract };
+            const fallback = defaultContracts[idx] || {};
+
+            if (!normalized.id) {
+                normalized.id = `contract_${idx}`;
+            }
+            if (!normalized.label || normalized.label.trim() === '') {
+                normalized.label = fallback.label || `Renting ${idx + 1}`;
+            }
+            if (!Number.isFinite(normalized.monthlyFeeNoVAT)) {
+                normalized.monthlyFeeNoVAT = fallback.monthlyFeeNoVAT || 0;
+            }
+            if (!Number.isFinite(normalized.annualAllowance)) {
+                normalized.annualAllowance = fallback.annualAllowance || 10000;
+            }
+            if (!Number.isFinite(normalized.penaltyPerKm)) {
+                normalized.penaltyPerKm = fallback.penaltyPerKm || 0.03;
+            }
+
+            return normalized;
+        });
+
+        this.currentInputs.contracts.forEach((contract, idx) => {
+            const contractDiv = document.createElement('div');
+            contractDiv.className = 'renting-contract';
+
+            const header = document.createElement('div');
+            header.className = 'contract-header';
+
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.value = contract.label;
+            nameInput.placeholder = 'Nombre contrato';
+            nameInput.oninput = (e) => {
+                this.currentInputs.contracts[idx].label = e.target.value;
+                this.saveToLocalStorage();
+            };
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'btn-remove-contract';
+            removeBtn.innerHTML = '✕';
+            removeBtn.title = 'Eliminar contrato';
+            removeBtn.disabled = this.currentInputs.contracts.length <= 1;
+            removeBtn.onclick = () => {
+                if (this.currentInputs.contracts.length <= 1) return;
+                this.currentInputs.contracts.splice(idx, 1);
+                this.renderRentingContracts();
+                this.saveToLocalStorage();
+            };
+
+            header.appendChild(nameInput);
+            header.appendChild(removeBtn);
+            contractDiv.appendChild(header);
+
+            contractDiv.appendChild(this.createContractField({
+                label: 'Cuota mensual (sin IVA):',
+                value: contract.monthlyFeeNoVAT,
+                step: '10',
+                min: '0',
+                unit: '€',
+                onChange: (val) => {
+                    this.currentInputs.contracts[idx].monthlyFeeNoVAT = val;
+                }
+            }));
+
+            contractDiv.appendChild(this.createContractField({
+                label: 'Km incluidos/año:',
+                value: contract.annualAllowance,
+                step: '500',
+                min: '0',
+                unit: 'km',
+                onChange: (val) => {
+                    this.currentInputs.contracts[idx].annualAllowance = val;
+                }
+            }));
+
+            contractDiv.appendChild(this.createContractField({
+                label: 'Penalización km:',
+                value: contract.penaltyPerKm,
+                step: '0.001',
+                min: '0',
+                max: '1',
+                unit: '€/km',
+                onChange: (val) => {
+                    this.currentInputs.contracts[idx].penaltyPerKm = val;
+                }
+            }));
+
+            container.appendChild(contractDiv);
+        });
+    }
+
+    renderRentingKpis(results) {
+        const container = document.getElementById('rentingKpiGrid');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        results.renting.forEach(r => {
+            const card = document.createElement('div');
+            card.className = 'kpi-card renting';
+
+            const isOptimal = r.contract.id === results.optimal.contract.id;
+            if (isOptimal) {
+                card.classList.add('optimal');
+            }
+
+            const monthlyFeeWithVat = r.contract.monthlyFeeNoVAT * (1 + this.currentInputs.vat);
+            const allowanceLabel = `${this.calculator.formatNumber(r.contract.annualAllowance, 0)} km/año`;
+            const feeLabel = `${this.calculator.formatCurrency(monthlyFeeWithVat)}/mes con IVA`;
+            const diff = r.npv - results.purchase.npv;
+            const diffLabel = diff <= 0 ? 'Ahorro vs compra' : 'Sobrecoste vs compra';
+            const diffValue = this.calculator.formatCurrency(Math.abs(diff));
+            const penaltyText = r.penalty > 0
+                ? `⚠️ Penalización: ${this.calculator.formatCurrency(r.penalty)} (${this.calculator.formatNumber(r.excessKm, 0)} km)`
+                : '✅ Sin penalización';
+
+            card.innerHTML = `
+                <div class="kpi-card-title">
+                    <h3>${r.contract.label}</h3>
+                    ${isOptimal ? '<span class="kpi-badge">Óptimo</span>' : ''}
+                </div>
+                <div class="kpi-value">${this.calculator.formatCurrency(r.npv)}</div>
+                <div class="kpi-label">VPN (€)</div>
+                <div class="kpi-meta">
+                    <span>${allowanceLabel}</span>
+                    <span>${feeLabel}</span>
+                </div>
+                <div class="penalty-info">
+                    ${diffLabel}: ${diffValue}<br>
+                    ${penaltyText}
+                </div>
+            `;
+
+            container.appendChild(card);
+        });
+    }
+
+    createContractField({ label, value, step, min, max, unit, onChange }) {
+        const group = document.createElement('div');
+        group.className = 'form-group';
+
+        const labelEl = document.createElement('label');
+        labelEl.textContent = label;
+        group.appendChild(labelEl);
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = value ?? '';
+        if (step) input.step = step;
+        if (min) input.min = min;
+        if (max) input.max = max;
+        input.oninput = (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            onChange(val);
+            this.saveToLocalStorage();
+        };
+        group.appendChild(input);
+
+        if (unit) {
+            const unitEl = document.createElement('span');
+            unitEl.className = 'unit';
+            unitEl.textContent = unit;
+            group.appendChild(unitEl);
+        }
+
+        return group;
+    }
+
+    addRentingContract() {
+        const newContract = {
+            id: `contract_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            label: `Renting ${this.currentInputs.contracts.length + 1}`,
+            monthlyFeeNoVAT: 300,
+            annualAllowance: 12000,
+            penaltyPerKm: 0.03
+        };
+        this.currentInputs.contracts.push(newContract);
+        this.renderRentingContracts();
+        this.saveToLocalStorage();
+    }
+
     renderCustomWeeks() {
         const container = document.getElementById('customWeeks');
         container.innerHTML = '';
@@ -303,11 +498,6 @@ class UIController {
         this.currentInputs.ownershipCosts = parseFloat(document.getElementById('ownershipCosts').value);
         this.currentInputs.fuelCost = parseFloat(document.getElementById('fuelCost').value);
         
-        this.currentInputs.contracts[0].monthlyFeeNoVAT = parseFloat(document.getElementById('rent10kFee').value);
-        this.currentInputs.contracts[0].penaltyPerKm = parseFloat(document.getElementById('rent10kPenalty').value);
-        this.currentInputs.contracts[1].monthlyFeeNoVAT = parseFloat(document.getElementById('rent15kFee').value);
-        this.currentInputs.contracts[1].penaltyPerKm = parseFloat(document.getElementById('rent15kPenalty').value);
-        
         this.currentInputs.weeksOff = parseFloat(document.getElementById('weeksOff').value) || 0;
         
         this.saveToLocalStorage();
@@ -326,18 +516,8 @@ class UIController {
     displayResults(results) {
         // Update KPIs
         document.getElementById('npvPurchase').textContent = this.calculator.formatCurrency(results.purchase.npv);
-        document.getElementById('npvOptimal').textContent = this.calculator.formatCurrency(results.optimal.npv);
-        document.getElementById('optimalTitle').textContent = results.optimal.contract.label;
         document.getElementById('difference').textContent = this.calculator.formatCurrency(results.difference);
-        
-        // Penalty info
-        const penaltyInfo = document.getElementById('penaltyInfo');
-        if (results.optimal.penalty > 0) {
-            penaltyInfo.innerHTML = `⚠️ Penalización: ${this.calculator.formatCurrency(results.optimal.penalty)}<br>` +
-                                   `(${this.calculator.formatNumber(results.optimal.excessKm, 0)} km excedidos)`;
-        } else {
-            penaltyInfo.innerHTML = '✅ Sin penalización';
-        }
+        this.renderRentingKpis(results);
         
         // Recommendation
         const recommendation = document.getElementById('recommendation');
@@ -380,7 +560,7 @@ class UIController {
         const data = [
             { label: 'Comprar', value: results.purchase.npv, color: '#f5576c' },
             ...results.renting.map(r => ({
-                label: r.contract.label.replace('Renting ', ''),
+                label: r.contract.label,
                 value: r.npv,
                 color: r.contract.id === results.optimal.contract.id ? '#43e97b' : '#4facfe'
             }))
@@ -902,6 +1082,7 @@ class UIController {
             this.renderWeeklyPlanner();
             this.renderOneOffTrips();
             this.renderCustomWeeks();
+            this.renderRentingContracts();
             this.updateAnnualKm();
         }
     }
