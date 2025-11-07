@@ -1138,6 +1138,17 @@ class UIController {
         const maxDiff = Math.max(...diffs);
         const maxAbs = Math.max(Math.abs(minDiff), Math.abs(maxDiff));
         
+        // Store mesh data for interactivity
+        this.meshData = {
+            mesh,
+            months,
+            kmValues,
+            cellWidth,
+            cellHeight,
+            padding,
+            maxAbs
+        };
+        
         // Draw cells
         mesh.forEach(point => {
             const xIdx = months.indexOf(point.months);
@@ -1206,6 +1217,98 @@ class UIController {
         ctx.textAlign = 'center';
         ctx.fillText('Compra mejor', legendX + legendWidth / 4, legendY + legendHeight + 15);
         ctx.fillText('Renting mejor', legendX + 3 * legendWidth / 4, legendY + legendHeight + 15);
+        
+        // Setup interactivity
+        this.setupMeshInteractivity(canvas);
+    }
+    
+    setupMeshInteractivity(canvas) {
+        // Remove existing listeners
+        const oldCanvas = canvas.cloneNode(true);
+        canvas.parentNode.replaceChild(oldCanvas, canvas);
+        const newCanvas = oldCanvas;
+        
+        // Create tooltip element
+        let tooltip = document.getElementById('meshTooltip');
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'meshTooltip';
+            tooltip.style.position = 'absolute';
+            tooltip.style.display = 'none';
+            tooltip.style.background = 'rgba(0, 0, 0, 0.9)';
+            tooltip.style.color = 'white';
+            tooltip.style.padding = '12px';
+            tooltip.style.borderRadius = '6px';
+            tooltip.style.fontSize = '13px';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.zIndex = '1000';
+            tooltip.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.3)';
+            tooltip.style.maxWidth = '300px';
+            tooltip.style.lineHeight = '1.5';
+            document.body.appendChild(tooltip);
+        }
+        
+        // Add mouse move handler
+        newCanvas.addEventListener('mousemove', (e) => {
+            if (!this.meshData) return;
+            
+            const rect = newCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const { mesh, months, kmValues, cellWidth, cellHeight, padding } = this.meshData;
+            
+            // Check if mouse is within the heatmap area
+            if (x < padding || x > rect.width - padding || y < padding || y > rect.height - padding) {
+                tooltip.style.display = 'none';
+                newCanvas.style.cursor = 'default';
+                return;
+            }
+            
+            // Find the cell under the mouse
+            const cellX = Math.floor((x - padding) / cellWidth);
+            const cellY = Math.floor((y - padding) / cellHeight);
+            
+            if (cellX >= 0 && cellX < months.length && cellY >= 0 && cellY < kmValues.length) {
+                const month = months[cellX];
+                const km = kmValues[cellY];
+                const point = mesh.find(p => p.months === month && p.kmPerYear === km);
+                
+                if (point) {
+                    newCanvas.style.cursor = 'pointer';
+                    
+                    // Show tooltip
+                    const diffSign = point.difference > 0 ? '+' : '';
+                    const winner = point.difference > 0 ? '🚗 Renting mejor' : '🏪 Compra mejor';
+                    
+                    tooltip.innerHTML = `
+                        <strong>${winner}</strong><br>
+                        <strong>Duración:</strong> ${point.months} meses (${point.years.toFixed(1)} años)<br>
+                        <strong>Km/año:</strong> ${this.calculator.formatNumber(point.kmPerYear, 0)} km<br>
+                        <strong>Diferencia:</strong> ${diffSign}${this.calculator.formatCurrency(point.difference)}<br>
+                        <strong>CPN Compra:</strong> ${this.calculator.formatCurrency(Math.abs(point.purchaseNPV))}<br>
+                        <strong>CPN Renting:</strong> ${this.calculator.formatCurrency(Math.abs(point.rentingNPV))}<br>
+                        <em>Contrato óptimo: ${point.optimalContract === 'rent10k' ? 'Renting 10k' : 'Renting 15k'}</em>
+                    `;
+                    
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = (e.clientX + 15) + 'px';
+                    tooltip.style.top = (e.clientY + 15) + 'px';
+                } else {
+                    tooltip.style.display = 'none';
+                    newCanvas.style.cursor = 'default';
+                }
+            } else {
+                tooltip.style.display = 'none';
+                newCanvas.style.cursor = 'default';
+            }
+        });
+        
+        // Hide tooltip when mouse leaves canvas
+        newCanvas.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+            newCanvas.style.cursor = 'default';
+        });
     }
 
     showDetailsTable(results) {
@@ -1267,6 +1370,14 @@ class UIController {
         
         document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
         document.getElementById(`${tabName}Tab`).classList.add('active');
+        
+        // Redraw mesh chart when mesh tab is shown to ensure proper sizing
+        if (tabName === 'mesh' && this.calculator.results) {
+            // Use setTimeout to ensure the tab content is rendered
+            setTimeout(() => {
+                this.generateMesh();
+            }, 50);
+        }
     }
 
     exportCSV() {
