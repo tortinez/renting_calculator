@@ -4,6 +4,8 @@ class UIController {
     constructor() {
         this.calculator = window.calculator;
         this.currentInputs = this.getDefaultInputs();
+        // Store chart instances for cleanup
+        this.chartInstances = {};
         this.initializeUI();
         this.attachEventListeners();
         this.loadFromLocalStorage();
@@ -548,16 +550,11 @@ class UIController {
 
     drawNPVChart(results) {
         const canvas = document.getElementById('npvChart');
-        const ctx = canvas.getContext('2d');
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 300;
-        
-        const width = canvas.width;
-        const height = canvas.height;
-        const padding = 60;
-        
-        ctx.clearRect(0, 0, width, height);
+        // Destroy existing chart if it exists
+        if (this.chartInstances.npvChart) {
+            this.chartInstances.npvChart.destroy();
+        }
         
         // Convert to positive values (CPN = Net Present Cost)
         const data = [
@@ -569,59 +566,102 @@ class UIController {
             }))
         ];
         
-        const maxValue = Math.max(...data.map(d => d.value));
-        const barWidth = (width - 2 * padding) / (data.length * 1.5);
-        const scale = (height - 2 * padding) / (maxValue * 1.2);
-        
-        data.forEach((d, i) => {
-            const x = padding + (i + 0.5) * barWidth * 1.5;
-            const barHeight = d.value * scale;
-            const y = height - padding - barHeight;
-            
-            ctx.fillStyle = d.color;
-            ctx.fillRect(x, y, barWidth, barHeight);
-            
-            // Label
-            ctx.fillStyle = '#333';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(d.label, x + barWidth / 2, height - padding + 20);
-            
-            // Value
-            ctx.fillText(this.calculator.formatCurrency(d.value), x + barWidth / 2, y - 5);
+        this.chartInstances.npvChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: data.map(d => d.label),
+                datasets: [{
+                    label: 'VPN',
+                    data: data.map(d => d.value),
+                    backgroundColor: data.map(d => d.color),
+                    borderColor: data.map(d => d.color),
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: (context) => {
+                                return `VPN: ${this.calculator.formatCurrency(context.parsed.y)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'VPN (€)',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            callback: function(value) {
+                                return new Intl.NumberFormat('es-ES', {
+                                    style: 'currency',
+                                    currency: 'EUR',
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                }).format(value);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Opción',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
         });
-        
-        // Y axis
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding, padding);
-        ctx.lineTo(padding, height - padding);
-        ctx.lineTo(width - padding, height - padding);
-        ctx.stroke();
-        
-        ctx.save();
-        ctx.translate(20, height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('CPN (€)', 0, 0);
-        ctx.restore();
     }
 
     drawAnnualChart(results) {
         const canvas = document.getElementById('annualChart');
-        const ctx = canvas.getContext('2d');
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 300;
-        
-        const width = canvas.width;
-        const height = canvas.height;
-        const padding = 60;
-        
-        ctx.clearRect(0, 0, width, height);
+        // Destroy existing chart if it exists
+        if (this.chartInstances.annualChart) {
+            this.chartInstances.annualChart.destroy();
+        }
         
         // Group cash flows by year
         const years = Math.ceil(this.currentInputs.months / 12);
@@ -639,8 +679,8 @@ class UIController {
                 const pCF = results.purchase.cashFlows.find(cf => cf.month === m);
                 const rCF = results.optimal.cashFlows.find(cf => cf.month === m);
                 
-                if (pCF) purchaseTotal += Math.abs(pCF.amount);
-                if (rCF) rentingTotal += Math.abs(rCF.amount);
+                if (pCF) purchaseTotal -= pCF.amount;
+                if (rCF) rentingTotal -= rCF.amount;
             }
             
             purchaseAnnual.push(purchaseTotal);
@@ -648,80 +688,178 @@ class UIController {
         }
         
         // Add initial purchase cost to year 0
-        purchaseAnnual[0] += Math.abs(results.purchase.cashFlows[0].amount);
-        
-        const maxCost = Math.max(...purchaseAnnual, ...rentingAnnual);
-        const xStep = (width - 2 * padding) / years;
-        const yScale = (height - 2 * padding) / (maxCost * 1.1);
-        
-        // Draw purchase line
-        ctx.strokeStyle = '#f5576c';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        purchaseAnnual.forEach((cost, i) => {
-            const x = padding + (i + 0.5) * xStep;
-            const y = height - padding - cost * yScale;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-        
-        // Draw renting line
-        ctx.strokeStyle = '#4facfe';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        rentingAnnual.forEach((cost, i) => {
-            const x = padding + (i + 0.5) * xStep;
-            const y = height - padding - cost * yScale;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-        
-        // Draw axes
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding, padding);
-        ctx.lineTo(padding, height - padding);
-        ctx.lineTo(width - padding, height - padding);
-        ctx.stroke();
-        
-        // X labels
-        ctx.fillStyle = '#333';
-        ctx.font = '11px Arial';
-        ctx.textAlign = 'center';
-        for (let i = 0; i < years; i++) {
-            const x = padding + (i + 0.5) * xStep;
-            ctx.fillText(`Año ${i + 1}`, x, height - padding + 15);
+        if (results.purchase.cashFlows.length > 0) {
+            purchaseAnnual[0] -= results.purchase.cashFlows[0].amount;
         }
         
-        // Legend
-        ctx.fillStyle = '#f5576c';
-        ctx.fillRect(width - 150, padding, 15, 15);
-        ctx.fillStyle = '#333';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'left';
-        ctx.fillText('Compra', width - 130, padding + 12);
+        const labels = Array.from({ length: years }, (_, i) => `Año ${i + 1}`);
+
+        const buildWaterfallSegments = (values) => {
+            const segments = [];
+            let cumulative = 0;
+            values.forEach((delta, idx) => {
+                const start = cumulative;
+                const end = start + delta;
+                const low = Math.min(start, end);
+                const high = Math.max(start, end);
+                segments.push({
+                    x: labels[idx],
+                    y: [low, high],
+                    delta,
+                    start,
+                    end
+                });
+                cumulative = end;
+            });
+            return segments;
+        };
+
+        const purchaseSegments = buildWaterfallSegments(purchaseAnnual);
+        const rentingSegments = buildWaterfallSegments(rentingAnnual);
         
-        ctx.fillStyle = '#4facfe';
-        ctx.fillRect(width - 150, padding + 25, 15, 15);
-        ctx.fillStyle = '#333';
-        ctx.fillText('Renting', width - 130, padding + 37);
+        this.chartInstances.annualChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Compra',
+                    data: purchaseSegments,
+                    parsing: {
+                        xAxisKey: 'x',
+                        yAxisKey: 'y'
+                    },
+                    backgroundColor: (context) => {
+                        const delta = context.raw?.delta || 0;
+                        return delta >= 0 ? '#f5576c' : '#10b981';
+                    },
+                    borderColor: (context) => {
+                        const delta = context.raw?.delta || 0;
+                        return delta >= 0 ? '#f5576c' : '#10b981';
+                    },
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.8,
+                    categoryPercentage: 0.45
+                }, {
+                    label: 'Renting',
+                    data: rentingSegments,
+                    parsing: {
+                        xAxisKey: 'x',
+                        yAxisKey: 'y'
+                    },
+                    backgroundColor: (context) => {
+                        const delta = context.raw?.delta || 0;
+                        return delta >= 0 ? '#4facfe' : '#10b981';
+                    },
+                    borderColor: (context) => {
+                        const delta = context.raw?.delta || 0;
+                        return delta >= 0 ? '#4facfe' : '#10b981';
+                    },
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.8,
+                    categoryPercentage: 0.45
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: (context) => {
+                                const delta = context.raw?.delta || 0;
+                                const sign = delta >= 0 ? '+' : '−';
+                                return `${context.dataset.label}: ${sign}${this.calculator.formatCurrency(Math.abs(delta))}`;
+                            },
+                            footer: (context) => {
+                                const raw = context[0]?.raw;
+                                if (!raw) return '';
+                                return `Acumulado: ${this.calculator.formatCurrency(raw.end)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Coste acumulado (€)',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            callback: (value) => {
+                                return this.calculator.formatCurrency(value);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'Año',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
     }
 
     drawWeeklyChart(results) {
         const canvas = document.getElementById('weeklyChart');
-        const ctx = canvas.getContext('2d');
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 300;
-        
-        const width = canvas.width;
-        const height = canvas.height;
-        const padding = 60;
-        
-        ctx.clearRect(0, 0, width, height);
+        // Destroy existing chart if it exists
+        if (this.chartInstances.weeklyChart) {
+            this.chartInstances.weeklyChart.destroy();
+        }
         
         const days = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
         const dayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -731,38 +869,88 @@ class UIController {
             );
         });
         
-        const maxKm = Math.max(...dayKm, 1);
-        const barWidth = (width - 2 * padding) / (days.length * 1.5);
-        const yScale = (height - 2 * padding) / (maxKm * 1.1);
-        
-        dayKm.forEach((km, i) => {
-            const x = padding + (i + 0.5) * barWidth * 1.5;
-            const barHeight = km * yScale;
-            const y = height - padding - barHeight;
-            
-            ctx.fillStyle = '#667eea';
-            ctx.fillRect(x, y, barWidth, barHeight);
-            
-            // Label
-            ctx.fillStyle = '#333';
-            ctx.font = '11px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(days[i], x + barWidth / 2, height - padding + 15);
-            
-            // Value
-            if (km > 0) {
-                ctx.fillText(`${Math.round(km)} km`, x + barWidth / 2, y - 5);
+        this.chartInstances.weeklyChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: days,
+                datasets: [{
+                    label: 'Kilómetros',
+                    data: dayKm,
+                    backgroundColor: '#667eea',
+                    borderColor: '#667eea',
+                    borderWidth: 2,
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: (context) => {
+                                return `${context.parsed.y} km`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Kilómetros',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            callback: function(value) {
+                                return value + ' km';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Día de la Semana',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
             }
         });
-        
-        // Axes
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding, padding);
-        ctx.lineTo(padding, height - padding);
-        ctx.lineTo(width - padding, height - padding);
-        ctx.stroke();
     }
 
     calculateBreakeven() {
@@ -782,71 +970,125 @@ class UIController {
 
     drawBreakevenChart(curve) {
         const canvas = document.getElementById('breakevenChart');
-        const ctx = canvas.getContext('2d');
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 400;
-        
-        const width = canvas.width;
-        const height = canvas.height;
-        const padding = 60;
-        
-        ctx.clearRect(0, 0, width, height);
-        
-        const maxDiff = Math.max(...curve.map(c => Math.abs(c.difference)));
-        const xScale = (width - 2 * padding) / curve.length;
-        const yScale = (height - 2 * padding) / (maxDiff * 1.2);
-        
-        // Draw zero line
-        ctx.strokeStyle = '#999';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        ctx.moveTo(padding, padding + (height - 2 * padding) / 2);
-        ctx.lineTo(width - padding, padding + (height - 2 * padding) / 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        // Draw curve
-        ctx.strokeStyle = '#667eea';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        curve.forEach((point, i) => {
-            const x = padding + i * xScale;
-            const y = padding + (height - 2 * padding) / 2 - point.difference * yScale;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-        
-        // Draw axes
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding, padding);
-        ctx.lineTo(padding, height - padding);
-        ctx.lineTo(width - padding, height - padding);
-        ctx.stroke();
-        
-        // X labels
-        ctx.fillStyle = '#333';
-        ctx.font = '11px Arial';
-        ctx.textAlign = 'center';
-        for (let i = 0; i < curve.length; i += 10) {
-            const x = padding + i * xScale;
-            ctx.fillText(curve[i].months, x, height - padding + 15);
+        // Destroy existing chart if it exists
+        if (this.chartInstances.breakevenChart) {
+            this.chartInstances.breakevenChart.destroy();
         }
         
-        ctx.fillText('Meses', width / 2, height - padding + 35);
-        
-        // Y label
-        ctx.save();
-        ctx.translate(20, height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.font = 'bold 12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Ahorro con Renting (€)', 0, 0);
-        ctx.restore();
+        this.chartInstances.breakevenChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: curve.map(c => c.months),
+                datasets: [{
+                    label: 'Diferencia VPN (Renting - Compra)',
+                    data: curve.map(c => c.difference),
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                    borderWidth: 4,
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 0,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#667eea',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: {
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            title: (context) => {
+                                return `${context[0].label} meses (${(context[0].label / 12).toFixed(1)} años)`;
+                            },
+                            label: (context) => {
+                                return `Diferencia: ${this.calculator.formatCurrency(context.parsed.y)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Diferencia VPN (Renting - Compra) €',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            callback: function(value) {
+                                return new Intl.NumberFormat('es-ES', {
+                                    style: 'currency',
+                                    currency: 'EUR',
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                }).format(value);
+                            }
+                        },
+                        grid: {
+                            color: (context) => {
+                                return context.tick.value === 0 ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.05)';
+                            },
+                            lineWidth: (context) => {
+                                return context.tick.value === 0 ? 2 : 1;
+                            }
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Meses',
+                            font: {
+                                weight: 'bold',
+                                size: 16
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            },
+                            maxTicksLimit: 12
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
     }
 
     generateMesh() {
@@ -871,12 +1113,14 @@ class UIController {
     drawMeshChart(mesh) {
         const canvas = document.getElementById('meshChart');
         const ctx = canvas.getContext('2d');
+
+        const wrapper = canvas.parentElement;
+        const width = (wrapper ? wrapper.clientWidth : canvas.offsetWidth) || 600;
+        const height = (wrapper ? wrapper.clientHeight : 500) || 500;
         
-        canvas.width = canvas.offsetWidth;
-        canvas.height = 500;
+        canvas.width = width;
+        canvas.height = height;
         
-        const width = canvas.width;
-        const height = canvas.height;
         const padding = 80;
         
         ctx.clearRect(0, 0, width, height);
