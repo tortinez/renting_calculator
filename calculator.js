@@ -50,6 +50,9 @@ class DCFCalculator {
     }
 
     // Piecewise linear interpolation for residual value
+    // @param {number} years - Number of years for interpolation
+    // @param {Array<{year: number, fraction: number}>} anchors - Array of anchor points
+    // @returns {number} Interpolated residual value fraction (0-1)
     interpolateResidual(years, anchors) {
         // Sort anchors by year
         const sorted = [...anchors].sort((a, b) => a.year - b.year);
@@ -435,7 +438,7 @@ class DCFCalculator {
                 csv += `${purchaseCF.maintenance || 0},`;
                 csv += `${purchaseCF.residual || 0},`;
             } else {
-                csv += ',,,,'
+                csv += ',,,,';
             }
             
             if (rentingCF) {

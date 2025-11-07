@@ -314,8 +314,13 @@ class UIController {
     }
 
     calculate() {
-        const results = this.calculator.calculate(this.currentInputs);
-        this.displayResults(results);
+        try {
+            const results = this.calculator.calculate(this.currentInputs);
+            this.displayResults(results);
+        } catch (error) {
+            console.error('Calculation error:', error);
+            alert('Error al calcular. Por favor, verifica los datos ingresados.');
+        }
     }
 
     displayResults(results) {
@@ -671,6 +676,20 @@ class UIController {
         this.drawMeshChart(mesh);
     }
 
+    // Helper function to calculate heatmap color based on difference
+    getHeatmapColor(difference, maxAbs) {
+        const ratio = difference / maxAbs;
+        if (ratio < 0) {
+            // Renting better (negative difference) - green
+            const intensity = Math.abs(ratio);
+            return `rgb(${Math.round(255 * (1 - intensity))}, 255, ${Math.round(255 * (1 - intensity))})`;
+        } else {
+            // Purchase better (positive difference) - red
+            const intensity = ratio;
+            return `rgb(255, ${Math.round(255 * (1 - intensity))}, ${Math.round(255 * (1 - intensity))})`;
+        }
+    }
+
     drawMeshChart(mesh) {
         const canvas = document.getElementById('meshChart');
         const ctx = canvas.getContext('2d');
@@ -705,18 +724,8 @@ class UIController {
             const x = padding + xIdx * cellWidth;
             const y = padding + yIdx * cellHeight;
             
-            // Color based on difference (green = renting better, red = purchase better)
-            const ratio = point.difference / maxAbs;
-            let color;
-            if (ratio < 0) {
-                // Renting better (negative difference) - green
-                const intensity = Math.abs(ratio);
-                color = `rgb(${Math.round(255 * (1 - intensity))}, 255, ${Math.round(255 * (1 - intensity))})`;
-            } else {
-                // Purchase better (positive difference) - red
-                const intensity = ratio;
-                color = `rgb(255, ${Math.round(255 * (1 - intensity))}, ${Math.round(255 * (1 - intensity))})`;
-            }
+            // Color based on difference using helper function
+            const color = this.getHeatmapColor(point.difference, maxAbs);
             
             ctx.fillStyle = color;
             ctx.fillRect(x, y, cellWidth, cellHeight);
@@ -862,7 +871,8 @@ class UIController {
         try {
             localStorage.setItem('rentingCalculatorInputs', JSON.stringify(this.currentInputs));
         } catch (e) {
-            console.error('Failed to save to localStorage', e);
+            console.error('No se pudo guardar en localStorage:', e);
+            // Silently fail - localStorage might be disabled or full
         }
     }
 
@@ -879,7 +889,8 @@ class UIController {
                 this.updateAnnualKm();
             }
         } catch (e) {
-            console.error('Failed to load from localStorage', e);
+            console.error('No se pudo cargar desde localStorage:', e);
+            // Continue with default values
         }
     }
 
