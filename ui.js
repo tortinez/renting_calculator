@@ -1099,13 +1099,13 @@ class UIController {
     // Helper function to calculate heatmap color based on difference
     getHeatmapColor(difference, maxAbs) {
         const ratio = difference / maxAbs;
-        if (ratio < 0) {
-            // Renting better (negative difference) - green
+        if (ratio > 0) {
+            // Positive difference: Renting better (costs less) - green
             const intensity = Math.abs(ratio);
             return `rgb(${Math.round(255 * (1 - intensity))}, 255, ${Math.round(255 * (1 - intensity))})`;
         } else {
-            // Purchase better (positive difference) - red
-            const intensity = ratio;
+            // Negative difference: Purchase better (costs less) - red
+            const intensity = Math.abs(ratio);
             return `rgb(255, ${Math.round(255 * (1 - intensity))}, ${Math.round(255 * (1 - intensity))})`;
         }
     }
