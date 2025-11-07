@@ -1223,10 +1223,13 @@ class UIController {
     }
     
     setupMeshInteractivity(canvas) {
-        // Remove existing listeners
-        const oldCanvas = canvas.cloneNode(true);
-        canvas.parentNode.replaceChild(oldCanvas, canvas);
-        const newCanvas = oldCanvas;
+        // Remove existing listeners if they exist
+        if (canvas._meshMouseMoveHandler) {
+            canvas.removeEventListener('mousemove', canvas._meshMouseMoveHandler);
+        }
+        if (canvas._meshMouseLeaveHandler) {
+            canvas.removeEventListener('mouseleave', canvas._meshMouseLeaveHandler);
+        }
         
         // Create tooltip element
         let tooltip = document.getElementById('meshTooltip');
@@ -1249,19 +1252,21 @@ class UIController {
         }
         
         // Add mouse move handler
-        newCanvas.addEventListener('mousemove', (e) => {
+        const mouseMoveHandler = (e) => {
             if (!this.meshData) return;
             
-            const rect = newCanvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
             
             const { mesh, months, kmValues, cellWidth, cellHeight, padding } = this.meshData;
             
             // Check if mouse is within the heatmap area
-            if (x < padding || x > rect.width - padding || y < padding || y > rect.height - padding) {
+            if (x < padding || x > canvas.width - padding || y < padding || y > canvas.height - padding) {
                 tooltip.style.display = 'none';
-                newCanvas.style.cursor = 'default';
+                canvas.style.cursor = 'default';
                 return;
             }
             
@@ -1275,7 +1280,7 @@ class UIController {
                 const point = mesh.find(p => p.months === month && p.kmPerYear === km);
                 
                 if (point) {
-                    newCanvas.style.cursor = 'pointer';
+                    canvas.style.cursor = 'pointer';
                     
                     // Show tooltip
                     const diffSign = point.difference > 0 ? '+' : '';
@@ -1296,19 +1301,27 @@ class UIController {
                     tooltip.style.top = (e.clientY + 15) + 'px';
                 } else {
                     tooltip.style.display = 'none';
-                    newCanvas.style.cursor = 'default';
+                    canvas.style.cursor = 'default';
                 }
             } else {
                 tooltip.style.display = 'none';
-                newCanvas.style.cursor = 'default';
+                canvas.style.cursor = 'default';
             }
-        });
+        };
+        
+        // Store the handler reference for cleanup
+        canvas._meshMouseMoveHandler = mouseMoveHandler;
+        canvas.addEventListener('mousemove', mouseMoveHandler);
         
         // Hide tooltip when mouse leaves canvas
-        newCanvas.addEventListener('mouseleave', () => {
+        const mouseLeaveHandler = () => {
             tooltip.style.display = 'none';
-            newCanvas.style.cursor = 'default';
-        });
+            canvas.style.cursor = 'default';
+        };
+        
+        // Store the handler reference for cleanup
+        canvas._meshMouseLeaveHandler = mouseLeaveHandler;
+        canvas.addEventListener('mouseleave', mouseLeaveHandler);
     }
 
     showDetailsTable(results) {
@@ -1373,10 +1386,10 @@ class UIController {
         
         // Redraw mesh chart when mesh tab is shown to ensure proper sizing
         if (tabName === 'mesh' && this.calculator.results) {
-            // Use setTimeout to ensure the tab content is rendered
-            setTimeout(() => {
+            // Use requestAnimationFrame to ensure the tab content is rendered
+            requestAnimationFrame(() => {
                 this.generateMesh();
-            }, 50);
+            });
         }
     }
 
