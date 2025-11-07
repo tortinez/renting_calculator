@@ -22,12 +22,12 @@ class DCFCalculator {
                 { id: 'rent15k', label: 'Renting 15k km/año', monthlyFeeNoVAT: 345, annualAllowance: 15000, penaltyPerKm: 0.035 }
             ],
             weeklyPlan: {
-                monday: [{ trips: 1, kmPerTrip: 20 }],
-                tuesday: [{ trips: 1, kmPerTrip: 60 }, { trips: 1, kmPerTrip: 20 }],
-                wednesday: [{ trips: 1, kmPerTrip: 15 }],
-                thursday: [{ trips: 1, kmPerTrip: 15 }, { trips: 1, kmPerTrip: 20 }],
+                monday: [{ trips: 2, kmPerTrip: 20 }],
+                tuesday: [{ trips: 2, kmPerTrip: 60 }, { trips: 2, kmPerTrip: 20 }],
+                wednesday: [{ trips: 2, kmPerTrip: 15 }],
+                thursday: [{ trips: 2, kmPerTrip: 15 }, { trips: 2, kmPerTrip: 20 }],
                 friday: [],
-                saturday: [{ trips: 1, kmPerTrip: 20 }],
+                saturday: [{ trips: 2, kmPerTrip: 20 }],
                 sunday: []
             },
             oneOffTrips: [
