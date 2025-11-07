@@ -1231,7 +1231,7 @@ class UIController {
             canvas.removeEventListener('mouseleave', canvas._meshMouseLeaveHandler);
         }
         
-        // Create tooltip element
+        // Create or get tooltip element
         let tooltip = document.getElementById('meshTooltip');
         if (!tooltip) {
             tooltip = document.createElement('div');
@@ -1248,7 +1248,15 @@ class UIController {
             tooltip.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.3)';
             tooltip.style.maxWidth = '300px';
             tooltip.style.lineHeight = '1.5';
-            document.body.appendChild(tooltip);
+            
+            // Append to canvas wrapper for better CSS isolation
+            const wrapper = canvas.parentElement;
+            if (wrapper) {
+                wrapper.style.position = 'relative';
+                wrapper.appendChild(tooltip);
+            } else {
+                document.body.appendChild(tooltip);
+            }
         }
         
         // Add mouse move handler
@@ -1297,8 +1305,17 @@ class UIController {
                     `;
                     
                     tooltip.style.display = 'block';
-                    tooltip.style.left = (e.clientX + 15) + 'px';
-                    tooltip.style.top = (e.clientY + 15) + 'px';
+                    
+                    // Position tooltip relative to wrapper if it's a child, otherwise relative to body
+                    const wrapper = canvas.parentElement;
+                    if (wrapper && wrapper.contains(tooltip)) {
+                        const wrapperRect = wrapper.getBoundingClientRect();
+                        tooltip.style.left = (e.clientX - wrapperRect.left + 15) + 'px';
+                        tooltip.style.top = (e.clientY - wrapperRect.top + 15) + 'px';
+                    } else {
+                        tooltip.style.left = (e.clientX + 15) + 'px';
+                        tooltip.style.top = (e.clientY + 15) + 'px';
+                    }
                 } else {
                     tooltip.style.display = 'none';
                     canvas.style.cursor = 'default';
@@ -1385,7 +1402,7 @@ class UIController {
         document.getElementById(`${tabName}Tab`).classList.add('active');
         
         // Redraw mesh chart when mesh tab is shown to ensure proper sizing
-        if (tabName === 'mesh' && this.calculator.results) {
+        if (tabName === 'mesh' && this.calculator.results && this.currentInputs) {
             // Use requestAnimationFrame to ensure the tab content is rendered
             requestAnimationFrame(() => {
                 this.generateMesh();
