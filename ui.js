@@ -366,7 +366,7 @@ class UIController {
     }
 
     // Helper method to draw y-axis with labels and grid lines
-    drawYAxis(ctx, minValue, maxValue, x, yStart, yEnd, numTicks = 5) {
+    drawYAxis(ctx, minValue, maxValue, x, yStart, yEnd, numTicks = 5, labelFormatter = null) {
         const range = maxValue - minValue;
         const tickInterval = range / numTicks;
         
@@ -392,8 +392,8 @@ class UIController {
             ctx.lineTo(x, y);
             ctx.stroke();
             
-            // Label
-            const label = this.calculator.formatCurrency(value);
+            // Label - use custom formatter if provided, otherwise default to currency
+            const label = labelFormatter ? labelFormatter(value) : this.calculator.formatCurrency(value);
             ctx.fillText(label, x - 10, y);
             
             // Grid line
@@ -717,51 +717,12 @@ class UIController {
         const plotWidth = width - padding.left - padding.right;
         const plotHeight = height - padding.top - padding.bottom;
         const barWidth = plotWidth / (days.length * 1.8);
-        
-        // Draw Y axis with labels (for km values)
         const yMax = maxKm * 1.15;
-        const numTicks = 5;
-        const tickInterval = yMax / numTicks;
         
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, padding.top);
-        ctx.lineTo(padding.left, height - padding.bottom);
-        ctx.stroke();
-        
-        ctx.fillStyle = '#333';
-        ctx.font = '11px Arial';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        
-        for (let i = 0; i <= numTicks; i++) {
-            const value = i * tickInterval;
-            const y = height - padding.bottom - (i * tickInterval / yMax) * plotHeight;
-            
-            // Tick mark
-            ctx.beginPath();
-            ctx.moveTo(padding.left - 5, y);
-            ctx.lineTo(padding.left, y);
-            ctx.stroke();
-            
-            // Label
-            ctx.fillText(Math.round(value) + ' km', padding.left - 10, y);
-            
-            // Grid line
-            if (i > 0) {
-                ctx.strokeStyle = '#e0e0e0';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([3, 3]);
-                ctx.beginPath();
-                ctx.moveTo(padding.left, y);
-                ctx.lineTo(width - padding.right, y);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 2;
-            }
-        }
+        // Draw Y axis with labels using helper method with km formatter
+        this.drawYAxis(ctx, 0, yMax, padding.left, padding.top, height - padding.bottom, 5, 
+            (value) => Math.round(value) + ' km'
+        );
         
         // Y axis title
         ctx.save();
