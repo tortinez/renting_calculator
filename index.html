@@ -157,16 +157,19 @@
                 </div>
 
                 <div id="summaryTab" class="tab-content active">
+                    <div class="npc-explanation">
+                        <p><strong>ℹ️ Sobre el Coste Presente Neto (CPN):</strong> El CPN representa el coste total de todos los pagos futuros, traídos a valor presente. Se muestra como valor positivo para facilitar la comparación: <strong>menor CPN = opción más económica</strong>.</p>
+                    </div>
                     <div class="kpis-grid primary-kpis">
                         <div class="kpi-card purchase">
                             <h3>Comprar</h3>
                             <div class="kpi-value" id="npvPurchase">—</div>
-                            <div class="kpi-label">VPN (€)</div>
+                            <div class="kpi-label">CPN (€)</div>
                         </div>
                         <div class="kpi-card difference">
                             <h3>Diferencia</h3>
                             <div class="kpi-value" id="difference">—</div>
-                            <div class="kpi-label">Renting - Compra (€)</div>
+                            <div class="kpi-label">Ahorro de Renting vs Compra (€)</div>
                         </div>
                     </div>
 
@@ -179,7 +182,7 @@
                     <div class="recommendation" id="recommendation"></div>
 
                     <div class="chart-container">
-                        <h3>Comparación VPN por Opción</h3>
+                        <h3>Comparación CPN por Opción</h3>
                         <canvas id="npvChart"></canvas>
                     </div>
 
@@ -203,7 +206,7 @@
                 </div>
 
                 <div id="meshTab" class="tab-content">
-                    <h3>Malla: Diferencia VPN (Meses × Km/año)</h3>
+                    <h3>Malla: Ahorro de Renting vs Compra (Meses × Km/año)</h3>
                     <div class="chart-container">
                         <canvas id="meshChart"></canvas>
                     </div>

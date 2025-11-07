@@ -353,8 +353,9 @@ class UIController {
             const monthlyFeeWithVat = r.contract.monthlyFeeNoVAT * (1 + this.currentInputs.vat);
             const allowanceLabel = `${this.calculator.formatNumber(r.contract.annualAllowance, 0)} km/año`;
             const feeLabel = `${this.calculator.formatCurrency(monthlyFeeWithVat)}/mes con IVA`;
+            // Difference: positive = this renting option costs less than purchase (saves money)
             const diff = r.npv - results.purchase.npv;
-            const diffLabel = diff <= 0 ? 'Ahorro vs compra' : 'Sobrecoste vs compra';
+            const diffLabel = diff > 0 ? 'Ahorro vs compra' : 'Sobrecoste vs compra';
             const diffValue = this.calculator.formatCurrency(Math.abs(diff));
             const penaltyText = r.penalty > 0
                 ? `⚠️ Penalización: ${this.calculator.formatCurrency(r.penalty)} (${this.calculator.formatNumber(r.excessKm, 0)} km)`
@@ -365,8 +366,8 @@ class UIController {
                     <h3>${r.contract.label}</h3>
                     ${isOptimal ? '<span class="kpi-badge">Óptimo</span>' : ''}
                 </div>
-                <div class="kpi-value">${this.calculator.formatCurrency(r.npv)}</div>
-                <div class="kpi-label">VPN (€)</div>
+                <div class="kpi-value">${this.calculator.formatCurrency(Math.abs(r.npv))}</div>
+                <div class="kpi-label">CPN (€)</div>
                 <div class="kpi-meta">
                     <span>${allowanceLabel}</span>
                     <span>${feeLabel}</span>
@@ -514,8 +515,9 @@ class UIController {
     }
 
     displayResults(results) {
-        // Update KPIs
-        document.getElementById('npvPurchase').textContent = this.calculator.formatCurrency(results.purchase.npv);
+        // Update KPIs - display as positive values (NPC = Net Present Cost)
+        document.getElementById('npvPurchase').textContent = this.calculator.formatCurrency(Math.abs(results.purchase.npv));
+        // Difference shows savings: positive = renting saves money
         document.getElementById('difference').textContent = this.calculator.formatCurrency(results.difference);
         this.renderRentingKpis(results);
         
@@ -523,10 +525,10 @@ class UIController {
         const recommendation = document.getElementById('recommendation');
         if (results.bestOption === 'purchase') {
             recommendation.className = 'recommendation best-purchase';
-            recommendation.textContent = `💰 Recomendación: COMPRAR es más económico. Ahorro VPN: ${this.calculator.formatCurrency(-results.difference)}`;
+            recommendation.textContent = `💰 Recomendación: COMPRAR es más económico. Ahorro: ${this.calculator.formatCurrency(Math.abs(results.difference))}`;
         } else {
             recommendation.className = 'recommendation best-renting';
-            recommendation.textContent = `🚗 Recomendación: ${results.optimal.contract.label} es más económico. Ahorro VPN: ${this.calculator.formatCurrency(-results.difference)}`;
+            recommendation.textContent = `🚗 Recomendación: ${results.optimal.contract.label} es más económico. Ahorro: ${this.calculator.formatCurrency(results.difference)}`;
         }
         
         // Draw charts
@@ -557,23 +559,24 @@ class UIController {
         
         ctx.clearRect(0, 0, width, height);
         
+        // Convert to positive values (CPN = Net Present Cost)
         const data = [
-            { label: 'Comprar', value: results.purchase.npv, color: '#f5576c' },
+            { label: 'Comprar', value: Math.abs(results.purchase.npv), color: '#f5576c' },
             ...results.renting.map(r => ({
                 label: r.contract.label,
-                value: r.npv,
+                value: Math.abs(r.npv),
                 color: r.contract.id === results.optimal.contract.id ? '#43e97b' : '#4facfe'
             }))
         ];
         
-        const maxAbs = Math.max(...data.map(d => Math.abs(d.value)));
+        const maxValue = Math.max(...data.map(d => d.value));
         const barWidth = (width - 2 * padding) / (data.length * 1.5);
-        const scale = (height - 2 * padding) / (maxAbs * 1.2);
+        const scale = (height - 2 * padding) / (maxValue * 1.2);
         
         data.forEach((d, i) => {
             const x = padding + (i + 0.5) * barWidth * 1.5;
-            const barHeight = Math.abs(d.value) * scale;
-            const y = padding + (height - 2 * padding) / 2 - (d.value > 0 ? barHeight : 0);
+            const barHeight = d.value * scale;
+            const y = height - padding - barHeight;
             
             ctx.fillStyle = d.color;
             ctx.fillRect(x, y, barWidth, barHeight);
@@ -588,18 +591,13 @@ class UIController {
             ctx.fillText(this.calculator.formatCurrency(d.value), x + barWidth / 2, y - 5);
         });
         
-        // Zero line
+        // Y axis
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(padding, padding + (height - 2 * padding) / 2);
-        ctx.lineTo(width - padding, padding + (height - 2 * padding) / 2);
-        ctx.stroke();
-        
-        // Y axis
-        ctx.beginPath();
         ctx.moveTo(padding, padding);
         ctx.lineTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
         ctx.stroke();
         
         ctx.save();
@@ -608,7 +606,7 @@ class UIController {
         ctx.fillStyle = '#333';
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('VPN (€)', 0, 0);
+        ctx.fillText('CPN (€)', 0, 0);
         ctx.restore();
     }
 
@@ -774,9 +772,9 @@ class UIController {
         info.innerHTML = `
             <h4>Punto de Equilibrio Aproximado</h4>
             <p><strong>Meses:</strong> ${breakevenData.breakEven.months} (${breakevenData.breakEven.years.toFixed(1)} años)</p>
-            <p><strong>Diferencia VPN:</strong> ${this.calculator.formatCurrency(breakevenData.breakEven.difference)}</p>
-            <p><strong>VPN Compra:</strong> ${this.calculator.formatCurrency(breakevenData.breakEven.purchaseNPV)}</p>
-            <p><strong>VPN Renting:</strong> ${this.calculator.formatCurrency(breakevenData.breakEven.rentingNPV)}</p>
+            <p><strong>Diferencia CPN:</strong> ${this.calculator.formatCurrency(Math.abs(breakevenData.breakEven.difference))}</p>
+            <p><strong>CPN Compra:</strong> ${this.calculator.formatCurrency(Math.abs(breakevenData.breakEven.purchaseNPV))}</p>
+            <p><strong>CPN Renting:</strong> ${this.calculator.formatCurrency(Math.abs(breakevenData.breakEven.rentingNPV))}</p>
         `;
         
         this.drawBreakevenChart(breakevenData.curve);
@@ -847,7 +845,7 @@ class UIController {
         ctx.rotate(-Math.PI / 2);
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('Diferencia VPN (Renting - Compra) €', 0, 0);
+        ctx.fillText('Ahorro con Renting (€)', 0, 0);
         ctx.restore();
     }
 
