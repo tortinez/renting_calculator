@@ -4,6 +4,7 @@ class UIController {
     constructor() {
         this.calculator = window.calculator;
         this.currentInputs = this.getDefaultInputs();
+        this.hoveredChartData = null;
         this.initializeUI();
         this.attachEventListeners();
         this.loadFromLocalStorage();
@@ -364,6 +365,96 @@ class UIController {
         this.showDetailsTable(results);
     }
 
+    // Helper method to draw y-axis with labels and grid lines
+    drawYAxis(ctx, minValue, maxValue, x, yStart, yEnd, numTicks = 5) {
+        const range = maxValue - minValue;
+        const tickInterval = range / numTicks;
+        
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, yStart);
+        ctx.lineTo(x, yEnd);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#333';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        
+        for (let i = 0; i <= numTicks; i++) {
+            const value = minValue + (i * tickInterval);
+            const y = yEnd - (i * tickInterval / range) * (yEnd - yStart);
+            
+            // Tick mark
+            ctx.beginPath();
+            ctx.moveTo(x - 5, y);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            
+            // Label
+            const label = this.calculator.formatCurrency(value);
+            ctx.fillText(label, x - 10, y);
+            
+            // Grid line
+            if (i > 0 && i < numTicks) {
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(ctx.canvas.width - 40, y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+            }
+        }
+    }
+
+    // Helper method to add hover tooltips to canvas
+    addCanvasTooltip(canvas, dataPoints, getTooltipText) {
+        const tooltip = document.createElement('div');
+        tooltip.style.position = 'absolute';
+        tooltip.style.background = 'rgba(0, 0, 0, 0.8)';
+        tooltip.style.color = 'white';
+        tooltip.style.padding = '8px 12px';
+        tooltip.style.borderRadius = '4px';
+        tooltip.style.pointerEvents = 'none';
+        tooltip.style.display = 'none';
+        tooltip.style.zIndex = '1000';
+        tooltip.style.fontSize = '12px';
+        tooltip.style.whiteSpace = 'nowrap';
+        canvas.parentElement.appendChild(tooltip);
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            let found = false;
+            for (const point of dataPoints) {
+                if (x >= point.x && x <= point.x + point.width && 
+                    y >= point.y && y <= point.y + point.height) {
+                    tooltip.innerHTML = getTooltipText(point.data);
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = (e.clientX + 10) + 'px';
+                    tooltip.style.top = (e.clientY - 10) + 'px';
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                tooltip.style.display = 'none';
+            }
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+        });
+    }
+
     drawNPVChart(results) {
         const canvas = document.getElementById('npvChart');
         const ctx = canvas.getContext('2d');
@@ -373,7 +464,7 @@ class UIController {
         
         const width = canvas.width;
         const height = canvas.height;
-        const padding = 60;
+        const padding = { left: 100, right: 40, top: 40, bottom: 60 };
         
         ctx.clearRect(0, 0, width, height);
         
@@ -386,50 +477,83 @@ class UIController {
             }))
         ];
         
-        const maxAbs = Math.max(...data.map(d => Math.abs(d.value)));
-        const barWidth = (width - 2 * padding) / (data.length * 1.5);
-        const scale = (height - 2 * padding) / (maxAbs * 1.2);
+        const values = data.map(d => d.value);
+        const minValue = Math.min(...values, 0);
+        const maxValue = Math.max(...values, 0);
+        const range = maxValue - minValue;
         
-        data.forEach((d, i) => {
-            const x = padding + (i + 0.5) * barWidth * 1.5;
-            const barHeight = Math.abs(d.value) * scale;
-            const y = padding + (height - 2 * padding) / 2 - (d.value > 0 ? barHeight : 0);
-            
-            ctx.fillStyle = d.color;
-            ctx.fillRect(x, y, barWidth, barHeight);
-            
-            // Label
-            ctx.fillStyle = '#333';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(d.label, x + barWidth / 2, height - padding + 20);
-            
-            // Value
-            ctx.fillText(this.calculator.formatCurrency(d.value), x + barWidth / 2, y - 5);
-        });
+        const barWidth = (width - padding.left - padding.right) / (data.length * 1.8);
+        const plotHeight = height - padding.top - padding.bottom;
         
-        // Zero line
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding, padding + (height - 2 * padding) / 2);
-        ctx.lineTo(width - padding, padding + (height - 2 * padding) / 2);
-        ctx.stroke();
+        // Draw Y axis with labels
+        this.drawYAxis(ctx, minValue, maxValue, padding.left, padding.top, height - padding.bottom);
         
-        // Y axis
-        ctx.beginPath();
-        ctx.moveTo(padding, padding);
-        ctx.lineTo(padding, height - padding);
-        ctx.stroke();
-        
+        // Y axis title
         ctx.save();
         ctx.translate(20, height / 2);
         ctx.rotate(-Math.PI / 2);
         ctx.fillStyle = '#333';
-        ctx.font = 'bold 12px Arial';
+        ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('VPN (€)', 0, 0);
         ctx.restore();
+        
+        // Zero line
+        const zeroY = height - padding.bottom - ((-minValue) / range) * plotHeight;
+        ctx.strokeStyle = '#999';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, zeroY);
+        ctx.lineTo(width - padding.right, zeroY);
+        ctx.stroke();
+        
+        // Draw bars
+        const dataPoints = [];
+        data.forEach((d, i) => {
+            const x = padding.left + (i + 0.5) * ((width - padding.left - padding.right) / data.length);
+            const barX = x - barWidth / 2;
+            const barValue = d.value - minValue;
+            const barHeight = (barValue / range) * plotHeight;
+            const barY = height - padding.bottom - barHeight;
+            
+            // Bar
+            ctx.fillStyle = d.color;
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+            
+            // Border
+            ctx.strokeStyle = d.color;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barX, barY, barWidth, barHeight);
+            
+            // X Label
+            ctx.fillStyle = '#333';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(d.label, x, height - padding.bottom + 20);
+            
+            // Value on top of bar
+            ctx.font = 'bold 11px Arial';
+            ctx.fillText(this.calculator.formatCurrency(d.value), x, barY - 5);
+            
+            dataPoints.push({
+                x: barX,
+                y: barY,
+                width: barWidth,
+                height: barHeight,
+                data: d
+            });
+        });
+        
+        // X axis title
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Opción', width / 2, height - 10);
+        
+        // Add tooltips
+        this.addCanvasTooltip(canvas, dataPoints, (d) => {
+            return `<strong>${d.label}</strong><br>VPN: ${this.calculator.formatCurrency(d.value)}`;
+        });
     }
 
     drawAnnualChart(results) {
@@ -441,7 +565,7 @@ class UIController {
         
         const width = canvas.width;
         const height = canvas.height;
-        const padding = 60;
+        const padding = { left: 100, right: 40, top: 60, bottom: 60 };
         
         ctx.clearRect(0, 0, width, height);
         
@@ -473,18 +597,48 @@ class UIController {
         purchaseAnnual[0] += Math.abs(results.purchase.cashFlows[0].amount);
         
         const maxCost = Math.max(...purchaseAnnual, ...rentingAnnual);
-        const xStep = (width - 2 * padding) / years;
-        const yScale = (height - 2 * padding) / (maxCost * 1.1);
+        const plotWidth = width - padding.left - padding.right;
+        const plotHeight = height - padding.top - padding.bottom;
+        const xStep = plotWidth / years;
+        
+        // Draw Y axis with labels
+        this.drawYAxis(ctx, 0, maxCost * 1.1, padding.left, padding.top, height - padding.bottom);
+        
+        // Y axis title
+        ctx.save();
+        ctx.translate(20, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Coste Anual (€)', 0, 0);
+        ctx.restore();
+        
+        // Draw axes
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, height - padding.bottom);
+        ctx.lineTo(width - padding.right, height - padding.bottom);
+        ctx.stroke();
         
         // Draw purchase line
         ctx.strokeStyle = '#f5576c';
         ctx.lineWidth = 3;
         ctx.beginPath();
         purchaseAnnual.forEach((cost, i) => {
-            const x = padding + (i + 0.5) * xStep;
-            const y = height - padding - cost * yScale;
+            const x = padding.left + (i + 0.5) * xStep;
+            const y = height - padding.bottom - (cost / (maxCost * 1.1)) * plotHeight;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
+            
+            // Point
+            ctx.save();
+            ctx.fillStyle = '#f5576c';
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         });
         ctx.stroke();
         
@@ -493,43 +647,49 @@ class UIController {
         ctx.lineWidth = 3;
         ctx.beginPath();
         rentingAnnual.forEach((cost, i) => {
-            const x = padding + (i + 0.5) * xStep;
-            const y = height - padding - cost * yScale;
+            const x = padding.left + (i + 0.5) * xStep;
+            const y = height - padding.bottom - (cost / (maxCost * 1.1)) * plotHeight;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
+            
+            // Point
+            ctx.save();
+            ctx.fillStyle = '#4facfe';
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         });
-        ctx.stroke();
-        
-        // Draw axes
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(padding, padding);
-        ctx.lineTo(padding, height - padding);
-        ctx.lineTo(width - padding, height - padding);
         ctx.stroke();
         
         // X labels
         ctx.fillStyle = '#333';
-        ctx.font = '11px Arial';
+        ctx.font = '12px Arial';
         ctx.textAlign = 'center';
         for (let i = 0; i < years; i++) {
-            const x = padding + (i + 0.5) * xStep;
-            ctx.fillText(`Año ${i + 1}`, x, height - padding + 15);
+            const x = padding.left + (i + 0.5) * xStep;
+            ctx.fillText(`Año ${i + 1}`, x, height - padding.bottom + 20);
         }
         
+        // X axis title
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('Año', width / 2, height - 10);
+        
         // Legend
+        const legendX = width - padding.right - 150;
+        const legendY = padding.top;
+        
         ctx.fillStyle = '#f5576c';
-        ctx.fillRect(width - 150, padding, 15, 15);
+        ctx.fillRect(legendX, legendY, 20, 3);
         ctx.fillStyle = '#333';
-        ctx.font = '12px Arial';
+        ctx.font = '13px Arial';
         ctx.textAlign = 'left';
-        ctx.fillText('Compra', width - 130, padding + 12);
+        ctx.fillText('Compra', legendX + 30, legendY + 5);
         
         ctx.fillStyle = '#4facfe';
-        ctx.fillRect(width - 150, padding + 25, 15, 15);
+        ctx.fillRect(legendX, legendY + 20, 20, 3);
         ctx.fillStyle = '#333';
-        ctx.fillText('Renting', width - 130, padding + 37);
+        ctx.fillText('Renting', legendX + 30, legendY + 25);
     }
 
     drawWeeklyChart(results) {
@@ -541,7 +701,7 @@ class UIController {
         
         const width = canvas.width;
         const height = canvas.height;
-        const padding = 60;
+        const padding = { left: 80, right: 40, top: 40, bottom: 60 };
         
         ctx.clearRect(0, 0, width, height);
         
@@ -554,37 +714,120 @@ class UIController {
         });
         
         const maxKm = Math.max(...dayKm, 1);
-        const barWidth = (width - 2 * padding) / (days.length * 1.5);
-        const yScale = (height - 2 * padding) / (maxKm * 1.1);
+        const plotWidth = width - padding.left - padding.right;
+        const plotHeight = height - padding.top - padding.bottom;
+        const barWidth = plotWidth / (days.length * 1.8);
         
-        dayKm.forEach((km, i) => {
-            const x = padding + (i + 0.5) * barWidth * 1.5;
-            const barHeight = km * yScale;
-            const y = height - padding - barHeight;
-            
-            ctx.fillStyle = '#667eea';
-            ctx.fillRect(x, y, barWidth, barHeight);
-            
-            // Label
-            ctx.fillStyle = '#333';
-            ctx.font = '11px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(days[i], x + barWidth / 2, height - padding + 15);
-            
-            // Value
-            if (km > 0) {
-                ctx.fillText(`${Math.round(km)} km`, x + barWidth / 2, y - 5);
-            }
-        });
+        // Draw Y axis with labels (for km values)
+        const yMax = maxKm * 1.15;
+        const numTicks = 5;
+        const tickInterval = yMax / numTicks;
         
-        // Axes
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(padding, padding);
-        ctx.lineTo(padding, height - padding);
-        ctx.lineTo(width - padding, height - padding);
+        ctx.moveTo(padding.left, padding.top);
+        ctx.lineTo(padding.left, height - padding.bottom);
         ctx.stroke();
+        
+        ctx.fillStyle = '#333';
+        ctx.font = '11px Arial';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        
+        for (let i = 0; i <= numTicks; i++) {
+            const value = i * tickInterval;
+            const y = height - padding.bottom - (i * tickInterval / yMax) * plotHeight;
+            
+            // Tick mark
+            ctx.beginPath();
+            ctx.moveTo(padding.left - 5, y);
+            ctx.lineTo(padding.left, y);
+            ctx.stroke();
+            
+            // Label
+            ctx.fillText(Math.round(value) + ' km', padding.left - 10, y);
+            
+            // Grid line
+            if (i > 0) {
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(width - padding.right, y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+            }
+        }
+        
+        // Y axis title
+        ctx.save();
+        ctx.translate(20, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Kilómetros', 0, 0);
+        ctx.restore();
+        
+        // Draw X axis
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, height - padding.bottom);
+        ctx.lineTo(width - padding.right, height - padding.bottom);
+        ctx.stroke();
+        
+        // Draw bars
+        const dataPoints = [];
+        dayKm.forEach((km, i) => {
+            const x = padding.left + (i + 0.5) * (plotWidth / days.length);
+            const barX = x - barWidth / 2;
+            const barHeight = (km / yMax) * plotHeight;
+            const barY = height - padding.bottom - barHeight;
+            
+            ctx.fillStyle = '#667eea';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+            
+            // Border
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barX, barY, barWidth, barHeight);
+            
+            // X Label
+            ctx.fillStyle = '#333';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(days[i], x, height - padding.bottom + 20);
+            
+            // Value on top of bar
+            if (km > 0) {
+                ctx.font = 'bold 11px Arial';
+                ctx.fillText(`${Math.round(km)}`, x, barY - 5);
+            }
+            
+            dataPoints.push({
+                x: barX,
+                y: barY,
+                width: barWidth,
+                height: barHeight,
+                data: { label: days[i], value: km }
+            });
+        });
+        
+        // X axis title
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Día de la Semana', width / 2, height - 10);
+        
+        // Add tooltips
+        this.addCanvasTooltip(canvas, dataPoints, (d) => {
+            return `<strong>${d.label}</strong><br>${Math.round(d.value)} km`;
+        });
     }
 
     calculateBreakeven() {
@@ -611,64 +854,98 @@ class UIController {
         
         const width = canvas.width;
         const height = canvas.height;
-        const padding = 60;
+        const padding = { left: 100, right: 40, top: 40, bottom: 70 };
         
         ctx.clearRect(0, 0, width, height);
         
-        const maxDiff = Math.max(...curve.map(c => Math.abs(c.difference)));
-        const xScale = (width - 2 * padding) / curve.length;
-        const yScale = (height - 2 * padding) / (maxDiff * 1.2);
+        const diffs = curve.map(c => c.difference);
+        const minDiff = Math.min(...diffs);
+        const maxDiff = Math.max(...diffs);
+        const range = maxDiff - minDiff;
         
-        // Draw zero line
-        ctx.strokeStyle = '#999';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        ctx.moveTo(padding, padding + (height - 2 * padding) / 2);
-        ctx.lineTo(width - padding, padding + (height - 2 * padding) / 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        const plotWidth = width - padding.left - padding.right;
+        const plotHeight = height - padding.top - padding.bottom;
+        const xScale = plotWidth / curve.length;
         
-        // Draw curve
-        ctx.strokeStyle = '#667eea';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        curve.forEach((point, i) => {
-            const x = padding + i * xScale;
-            const y = padding + (height - 2 * padding) / 2 - point.difference * yScale;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
+        // Draw Y axis with labels
+        this.drawYAxis(ctx, minDiff, maxDiff, padding.left, padding.top, height - padding.bottom, 6);
         
-        // Draw axes
+        // Y axis title
+        ctx.save();
+        ctx.translate(20, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Diferencia VPN (Renting - Compra) €', 0, 0);
+        ctx.restore();
+        
+        // Draw X axis
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(padding, padding);
-        ctx.lineTo(padding, height - padding);
-        ctx.lineTo(width - padding, height - padding);
+        ctx.moveTo(padding.left, height - padding.bottom);
+        ctx.lineTo(width - padding.right, height - padding.bottom);
         ctx.stroke();
+        
+        // Draw zero line (horizontal)
+        const zeroY = height - padding.bottom - ((-minDiff) / range) * plotHeight;
+        ctx.strokeStyle = '#999';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, zeroY);
+        ctx.lineTo(width - padding.right, zeroY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Draw curve with filled area
+        ctx.strokeStyle = '#667eea';
+        ctx.fillStyle = 'rgba(102, 126, 234, 0.2)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        
+        curve.forEach((point, i) => {
+            const x = padding.left + i * xScale;
+            const y = height - padding.bottom - ((point.difference - minDiff) / range) * plotHeight;
+            if (i === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+        
+        // Fill area under curve
+        ctx.lineTo(width - padding.right, height - padding.bottom);
+        ctx.lineTo(padding.left, height - padding.bottom);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Add points on the line
+        curve.forEach((point, i) => {
+            if (i % 10 === 0 || i === curve.length - 1) {
+                const x = padding.left + i * xScale;
+                const y = height - padding.bottom - ((point.difference - minDiff) / range) * plotHeight;
+                ctx.fillStyle = '#667eea';
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
         
         // X labels
         ctx.fillStyle = '#333';
         ctx.font = '11px Arial';
         ctx.textAlign = 'center';
         for (let i = 0; i < curve.length; i += 10) {
-            const x = padding + i * xScale;
-            ctx.fillText(curve[i].months, x, height - padding + 15);
+            const x = padding.left + i * xScale;
+            ctx.fillText(curve[i].months, x, height - padding.bottom + 20);
         }
         
-        ctx.fillText('Meses', width / 2, height - padding + 35);
-        
-        // Y label
-        ctx.save();
-        ctx.translate(20, height / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.font = 'bold 12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Diferencia VPN (Renting - Compra) €', 0, 0);
-        ctx.restore();
+        // X axis title
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText('Meses', width / 2, height - 10);
     }
 
     generateMesh() {
