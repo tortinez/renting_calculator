@@ -1099,13 +1099,13 @@ class UIController {
     // Helper function to calculate heatmap color based on difference
     getHeatmapColor(difference, maxAbs) {
         const ratio = difference / maxAbs;
-        if (ratio < 0) {
-            // Renting better (negative difference) - green
+        if (ratio > 0) {
+            // Positive difference: Renting better (costs less) - green
             const intensity = Math.abs(ratio);
             return `rgb(${Math.round(255 * (1 - intensity))}, 255, ${Math.round(255 * (1 - intensity))})`;
         } else {
-            // Purchase better (positive difference) - red
-            const intensity = ratio;
+            // Negative difference: Purchase better (costs less) - red
+            const intensity = Math.abs(ratio);
             return `rgb(255, ${Math.round(255 * (1 - intensity))}, ${Math.round(255 * (1 - intensity))})`;
         }
     }
@@ -1137,6 +1137,17 @@ class UIController {
         const minDiff = Math.min(...diffs);
         const maxDiff = Math.max(...diffs);
         const maxAbs = Math.max(Math.abs(minDiff), Math.abs(maxDiff));
+        
+        // Store mesh data for interactivity
+        this.meshData = {
+            mesh,
+            months,
+            kmValues,
+            cellWidth,
+            cellHeight,
+            padding,
+            maxAbs
+        };
         
         // Draw cells
         mesh.forEach(point => {
@@ -1206,6 +1217,128 @@ class UIController {
         ctx.textAlign = 'center';
         ctx.fillText('Compra mejor', legendX + legendWidth / 4, legendY + legendHeight + 15);
         ctx.fillText('Renting mejor', legendX + 3 * legendWidth / 4, legendY + legendHeight + 15);
+        
+        // Setup interactivity
+        this.setupMeshInteractivity(canvas);
+    }
+    
+    setupMeshInteractivity(canvas) {
+        // Remove existing listeners if they exist
+        if (canvas._meshMouseMoveHandler) {
+            canvas.removeEventListener('mousemove', canvas._meshMouseMoveHandler);
+        }
+        if (canvas._meshMouseLeaveHandler) {
+            canvas.removeEventListener('mouseleave', canvas._meshMouseLeaveHandler);
+        }
+        
+        // Create or get tooltip element
+        let tooltip = document.getElementById('meshTooltip');
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'meshTooltip';
+            tooltip.style.position = 'absolute';
+            tooltip.style.display = 'none';
+            tooltip.style.background = 'rgba(0, 0, 0, 0.9)';
+            tooltip.style.color = 'white';
+            tooltip.style.padding = '12px';
+            tooltip.style.borderRadius = '6px';
+            tooltip.style.fontSize = '13px';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.zIndex = '1000';
+            tooltip.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.3)';
+            tooltip.style.maxWidth = '300px';
+            tooltip.style.lineHeight = '1.5';
+            
+            // Append to canvas wrapper for better CSS isolation
+            const wrapper = canvas.parentElement;
+            if (wrapper) {
+                wrapper.style.position = 'relative';
+                wrapper.appendChild(tooltip);
+            } else {
+                document.body.appendChild(tooltip);
+            }
+        }
+        
+        // Add mouse move handler
+        const mouseMoveHandler = (e) => {
+            if (!this.meshData) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            
+            const { mesh, months, kmValues, cellWidth, cellHeight, padding } = this.meshData;
+            
+            // Check if mouse is within the heatmap area
+            if (x < padding || x > canvas.width - padding || y < padding || y > canvas.height - padding) {
+                tooltip.style.display = 'none';
+                canvas.style.cursor = 'default';
+                return;
+            }
+            
+            // Find the cell under the mouse
+            const cellX = Math.floor((x - padding) / cellWidth);
+            const cellY = Math.floor((y - padding) / cellHeight);
+            
+            if (cellX >= 0 && cellX < months.length && cellY >= 0 && cellY < kmValues.length) {
+                const month = months[cellX];
+                const km = kmValues[cellY];
+                const point = mesh.find(p => p.months === month && p.kmPerYear === km);
+                
+                if (point) {
+                    canvas.style.cursor = 'pointer';
+                    
+                    // Show tooltip
+                    const diffSign = point.difference > 0 ? '+' : '';
+                    const winner = point.difference > 0 ? '🚗 Renting mejor' : '🏪 Compra mejor';
+                    
+                    tooltip.innerHTML = `
+                        <strong>${winner}</strong><br>
+                        <strong>Duración:</strong> ${point.months} meses (${point.years.toFixed(1)} años)<br>
+                        <strong>Km/año:</strong> ${this.calculator.formatNumber(point.kmPerYear, 0)} km<br>
+                        <strong>Diferencia:</strong> ${diffSign}${this.calculator.formatCurrency(point.difference)}<br>
+                        <strong>CPN Compra:</strong> ${this.calculator.formatCurrency(Math.abs(point.purchaseNPV))}<br>
+                        <strong>CPN Renting:</strong> ${this.calculator.formatCurrency(Math.abs(point.rentingNPV))}<br>
+                        <em>Contrato óptimo: ${point.optimalContract === 'rent10k' ? 'Renting 10k' : 'Renting 15k'}</em>
+                    `;
+                    
+                    tooltip.style.display = 'block';
+                    
+                    // Position tooltip relative to wrapper if it's a child, otherwise relative to body
+                    const wrapper = canvas.parentElement;
+                    if (wrapper && wrapper.contains(tooltip)) {
+                        const wrapperRect = wrapper.getBoundingClientRect();
+                        tooltip.style.left = (e.clientX - wrapperRect.left + 15) + 'px';
+                        tooltip.style.top = (e.clientY - wrapperRect.top + 15) + 'px';
+                    } else {
+                        tooltip.style.left = (e.clientX + 15) + 'px';
+                        tooltip.style.top = (e.clientY + 15) + 'px';
+                    }
+                } else {
+                    tooltip.style.display = 'none';
+                    canvas.style.cursor = 'default';
+                }
+            } else {
+                tooltip.style.display = 'none';
+                canvas.style.cursor = 'default';
+            }
+        };
+        
+        // Store the handler reference for cleanup
+        canvas._meshMouseMoveHandler = mouseMoveHandler;
+        canvas.addEventListener('mousemove', mouseMoveHandler);
+        
+        // Hide tooltip when mouse leaves canvas
+        const mouseLeaveHandler = () => {
+            tooltip.style.display = 'none';
+            canvas.style.cursor = 'default';
+        };
+        
+        // Store the handler reference for cleanup
+        canvas._meshMouseLeaveHandler = mouseLeaveHandler;
+        canvas.addEventListener('mouseleave', mouseLeaveHandler);
     }
 
     showDetailsTable(results) {
@@ -1267,6 +1400,14 @@ class UIController {
         
         document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
         document.getElementById(`${tabName}Tab`).classList.add('active');
+        
+        // Redraw mesh chart when mesh tab is shown to ensure proper sizing
+        if (tabName === 'mesh' && this.calculator.results && this.currentInputs) {
+            // Use requestAnimationFrame to ensure the tab content is rendered
+            requestAnimationFrame(() => {
+                this.generateMesh();
+            });
+        }
     }
 
     exportCSV() {
