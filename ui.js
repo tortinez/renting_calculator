@@ -674,11 +674,11 @@ class UIController {
         // Convert to positive values (CPN = Net Present Cost)
         const purchaseLabel = results.purchase.financing ? 'Comprar (Financiado)' : 'Comprar';
         const data = [
-            { label: purchaseLabel, value: Math.abs(results.purchase.npv), color: results.purchase.financing ? '#764ba2' : '#f5576c' },
+            { label: purchaseLabel, value: Math.abs(results.purchase.npv), color: results.purchase.financing ? '#546E7A' : '#E91E63' },
             ...results.renting.map(r => ({
                 label: r.contract.label,
                 value: Math.abs(r.npv),
-                color: r.contract.id === results.optimal.contract.id ? '#43e97b' : '#4facfe'
+                color: r.contract.id === results.optimal.contract.id ? '#F57C00' : '#1976D2'
             }))
         ];
         
@@ -846,11 +846,11 @@ class UIController {
                     },
                     backgroundColor: (context) => {
                         const delta = context.raw?.delta || 0;
-                        return delta >= 0 ? '#f5576c' : '#10b981';
+                        return delta >= 0 ? '#E91E63' : '#388E3C';
                     },
                     borderColor: (context) => {
                         const delta = context.raw?.delta || 0;
-                        return delta >= 0 ? '#f5576c' : '#10b981';
+                        return delta >= 0 ? '#E91E63' : '#388E3C';
                     },
                     borderWidth: 1,
                     borderRadius: 6,
@@ -865,11 +865,11 @@ class UIController {
                     },
                     backgroundColor: (context) => {
                         const delta = context.raw?.delta || 0;
-                        return delta >= 0 ? '#4facfe' : '#10b981';
+                        return delta >= 0 ? '#1976D2' : '#388E3C';
                     },
                     borderColor: (context) => {
                         const delta = context.raw?.delta || 0;
-                        return delta >= 0 ? '#4facfe' : '#10b981';
+                        return delta >= 0 ? '#1976D2' : '#388E3C';
                     },
                     borderWidth: 1,
                     borderRadius: 6,
@@ -992,8 +992,8 @@ class UIController {
                 datasets: [{
                     label: 'Kilómetros',
                     data: dayKm,
-                    backgroundColor: '#667eea',
-                    borderColor: '#667eea',
+                    backgroundColor: '#1976D2',
+                    borderColor: '#1976D2',
                     borderWidth: 2,
                     borderRadius: 8
                 }]
@@ -1099,14 +1099,14 @@ class UIController {
                 datasets: [{
                     label: 'Diferencia VPN (Renting - Compra)',
                     data: curve.map(c => c.difference),
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                    borderColor: '#1976D2',
+                    backgroundColor: 'rgba(25, 118, 210, 0.15)',
                     borderWidth: 4,
                     tension: 0.3,
                     fill: true,
                     pointRadius: 0,
                     pointHoverRadius: 6,
-                    pointHoverBackgroundColor: '#667eea',
+                    pointHoverBackgroundColor: '#1976D2',
                     pointHoverBorderColor: '#fff',
                     pointHoverBorderWidth: 2
                 }]
