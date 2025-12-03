@@ -125,9 +125,18 @@ class DCFCalculator {
         return Math.max(0, annualKm);
     }
 
-    // Calculate monthly loan payment using standard amortization formula
-    // r = (1 + TAE)^(1/12) - 1
-    // payment = principal * r / (1 - (1 + r)^(-term))
+    /**
+     * Calculate monthly loan payment using standard amortization formula.
+     * 
+     * @param {number} principal - The loan principal amount
+     * @param {number} annualRate - Annual interest rate (TAE) as decimal (e.g., 0.07 for 7%)
+     * @param {number} termMonths - Loan duration in months
+     * @returns {number} Monthly payment amount
+     * 
+     * Formula:
+     *   r = (1 + TAE)^(1/12) - 1  (monthly rate derived from TAE)
+     *   payment = principal * r / (1 - (1 + r)^(-term))
+     */
     calculateMonthlyLoanPayment(principal, annualRate, termMonths) {
         if (principal <= 0 || termMonths <= 0) return 0;
         if (annualRate <= 0) return principal / termMonths; // No interest case
@@ -137,7 +146,18 @@ class DCFCalculator {
         return payment;
     }
 
-    // Generate loan amortization schedule with principal/interest split
+    /**
+     * Generate loan amortization schedule with principal/interest split.
+     * 
+     * @param {number} loanAmount - Total loan amount
+     * @param {number} annualRate - Annual interest rate (TAE) as decimal
+     * @param {number} termMonths - Loan duration in months
+     * @param {number} balloonPayment - Optional final lump sum payment (defaults to 0)
+     * @returns {Array<{month: number, payment: number, principal: number, interest: number, remainingBalance: number}>}
+     * 
+     * For balloon loans: Monthly payments are calculated to fully amortize (loanAmount - balloonPayment),
+     * with the balloon payment due as an additional lump sum in the final month.
+     */
     generateLoanSchedule(loanAmount, annualRate, termMonths, balloonPayment = 0) {
         const schedule = [];
         
@@ -145,10 +165,15 @@ class DCFCalculator {
             return schedule;
         }
         
-        // Adjust principal for balloon payment
-        // For balloon loans, reduce principal so regular payments are smaller
-        const adjustedPrincipal = balloonPayment > 0 ? loanAmount - balloonPayment : loanAmount;
-        const monthlyPayment = this.calculateMonthlyLoanPayment(adjustedPrincipal, annualRate, termMonths);
+        // Validate balloon payment
+        const validBalloon = Math.min(balloonPayment, loanAmount);
+        
+        // For balloon loans: calculate monthly payment to amortize (loanAmount - balloon) over termMonths
+        // The balloon payment is an additional lump sum due at the end
+        const amortizedPrincipal = loanAmount - validBalloon;
+        const monthlyPayment = amortizedPrincipal > 0 
+            ? this.calculateMonthlyLoanPayment(amortizedPrincipal, annualRate, termMonths)
+            : 0;
         const monthlyRate = annualRate <= 0 ? 0 : this.annualToMonthlyRate(annualRate);
         
         let remainingBalance = loanAmount;
@@ -158,14 +183,9 @@ class DCFCalculator {
             let principalPayment = monthlyPayment - interestPayment;
             let totalPayment = monthlyPayment;
             
-            // Last month: add balloon payment if any
-            if (month === termMonths && balloonPayment > 0) {
-                principalPayment += balloonPayment;
-                totalPayment += balloonPayment;
-            }
-            
-            // Ensure we don't overpay
+            // Last month: add balloon payment and adjust for any remaining balance
             if (month === termMonths) {
+                // Pay off all remaining balance (includes balloon)
                 principalPayment = remainingBalance;
                 totalPayment = principalPayment + interestPayment;
             }
@@ -184,7 +204,19 @@ class DCFCalculator {
         return schedule;
     }
 
-    // Calculate financing summary
+    /**
+     * Calculate financing summary including total costs and monthly payment.
+     * 
+     * @param {Object} financing - Financing configuration object
+     * @param {boolean} financing.enabled - Whether financing is enabled
+     * @param {number|null} financing.loanAmount - Loan amount (null defaults to purchasePrice - downPayment)
+     * @param {number} financing.downPayment - Down payment amount
+     * @param {number} financing.termMonths - Loan term in months
+     * @param {number} financing.annualInterestRate - TAE as decimal (e.g., 0.07 for 7%)
+     * @param {number} financing.balloonPayment - Optional final balloon payment
+     * @param {number} purchasePrice - Vehicle purchase price
+     * @returns {Object} Financing summary with loanAmount, monthlyPayment, totalInterest, totalFinancedCost, etc.
+     */
     calculateFinancingSummary(financing, purchasePrice) {
         const downPayment = financing.downPayment || 0;
         const loanAmount = financing.loanAmount !== null ? financing.loanAmount : (purchasePrice - downPayment);
