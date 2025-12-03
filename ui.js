@@ -21,6 +21,7 @@ class UIController {
             purchasePrice: 33000,
             ownershipCosts: 1200,
             fuelCost: 0.104,
+            financing: JSON.parse(JSON.stringify(this.calculator.defaults.financing)),
             residualAnchors: this.calculator.defaults.residualAnchors,
             contracts: JSON.parse(JSON.stringify(this.calculator.defaults.contracts)),
             weeklyPlan: JSON.parse(JSON.stringify(this.calculator.defaults.weeklyPlan)),
@@ -36,6 +37,7 @@ class UIController {
         this.renderOneOffTrips();
         this.renderCustomWeeks();
         this.syncInputsToUI();
+        this.setupFinancingUI();
     }
 
     syncInputsToUI() {
@@ -48,6 +50,94 @@ class UIController {
         document.getElementById('ownershipCosts').value = this.currentInputs.ownershipCosts;
         document.getElementById('fuelCost').value = this.currentInputs.fuelCost;
         document.getElementById('weeksOff').value = this.currentInputs.weeksOff;
+        
+        // Sync financing inputs
+        if (this.currentInputs.financing) {
+            document.getElementById('financingEnabled').checked = this.currentInputs.financing.enabled;
+            document.getElementById('downPayment').value = this.currentInputs.financing.downPayment || 0;
+            document.getElementById('loanTermMonths').value = this.currentInputs.financing.termMonths || 60;
+            // Round to avoid floating point display issues
+            document.getElementById('annualInterestRate').value = Math.round((this.currentInputs.financing.annualInterestRate || 0.07) * 1000) / 10;
+            document.getElementById('balloonPayment').value = this.currentInputs.financing.balloonPayment || 0;
+            
+            // Show/hide financing inputs based on enabled state
+            const financingInputs = document.getElementById('financingInputs');
+            financingInputs.style.display = this.currentInputs.financing.enabled ? 'block' : 'none';
+            
+            // Update financing summary
+            if (this.currentInputs.financing.enabled) {
+                this.updateFinancingSummary();
+            }
+        }
+    }
+
+    setupFinancingUI() {
+        const checkbox = document.getElementById('financingEnabled');
+        const financingInputs = document.getElementById('financingInputs');
+        
+        // Toggle financing inputs visibility
+        checkbox.addEventListener('change', (e) => {
+            this.currentInputs.financing.enabled = e.target.checked;
+            financingInputs.style.display = e.target.checked ? 'block' : 'none';
+            if (e.target.checked) {
+                this.updateFinancingSummary();
+            }
+            this.saveToLocalStorage();
+        });
+        
+        // Update financing summary when inputs change
+        const financingFields = ['downPayment', 'loanTermMonths', 'annualInterestRate', 'balloonPayment'];
+        financingFields.forEach(field => {
+            document.getElementById(field).addEventListener('input', () => {
+                this.updateFinancingSummary();
+            });
+        });
+        
+        // Also update when purchase price changes
+        document.getElementById('purchasePrice').addEventListener('input', () => {
+            if (this.currentInputs.financing.enabled) {
+                this.updateFinancingSummary();
+            }
+        });
+    }
+
+    updateFinancingSummary() {
+        const purchasePrice = parseFloat(document.getElementById('purchasePrice').value) || 0;
+        const downPayment = parseFloat(document.getElementById('downPayment').value) || 0;
+        const termMonths = parseInt(document.getElementById('loanTermMonths').value) || 60;
+        const annualRate = (parseFloat(document.getElementById('annualInterestRate').value) || 7) / 100;
+        const balloonPayment = parseFloat(document.getElementById('balloonPayment').value) || 0;
+        
+        const financingConfig = {
+            enabled: true,
+            downPayment: downPayment,
+            loanAmount: null, // Will be calculated as purchasePrice - downPayment
+            termMonths: termMonths,
+            annualInterestRate: annualRate,
+            balloonPayment: balloonPayment
+        };
+        
+        const summary = this.calculator.calculateFinancingSummary(financingConfig, purchasePrice);
+        
+        const summaryDiv = document.getElementById('financingSummary');
+        summaryDiv.innerHTML = `
+            <div class="financing-summary-item">
+                <span>Importe a financiar:</span>
+                <span>${this.calculator.formatCurrency(summary.loanAmount)}</span>
+            </div>
+            <div class="financing-summary-item">
+                <span>Cuota mensual:</span>
+                <span>${this.calculator.formatCurrency(summary.monthlyPayment)}</span>
+            </div>
+            <div class="financing-summary-item">
+                <span>Total intereses:</span>
+                <span>${this.calculator.formatCurrency(summary.totalInterest)}</span>
+            </div>
+            <div class="financing-summary-item">
+                <span>Coste total financiado:</span>
+                <span>${this.calculator.formatCurrency(summary.totalFinancedCost)}</span>
+            </div>
+        `;
     }
 
     attachEventListeners() {
@@ -503,6 +593,16 @@ class UIController {
         
         this.currentInputs.weeksOff = parseFloat(document.getElementById('weeksOff').value) || 0;
         
+        // Collect financing inputs
+        this.currentInputs.financing = {
+            enabled: document.getElementById('financingEnabled').checked,
+            downPayment: parseFloat(document.getElementById('downPayment').value) || 0,
+            loanAmount: null, // Will be calculated as purchasePrice - downPayment
+            termMonths: parseInt(document.getElementById('loanTermMonths').value) || 60,
+            annualInterestRate: (parseFloat(document.getElementById('annualInterestRate').value) || 7) / 100,
+            balloonPayment: parseFloat(document.getElementById('balloonPayment').value) || 0
+        };
+        
         this.saveToLocalStorage();
     }
 
@@ -523,11 +623,26 @@ class UIController {
         document.getElementById('difference').textContent = this.calculator.formatCurrency(results.difference);
         this.renderRentingKpis(results);
         
+        // Update financing KPIs if financing is enabled
+        const financingKpis = document.getElementById('financingKpis');
+        if (results.purchase.financing) {
+            financingKpis.style.display = 'block';
+            document.getElementById('financingMonthlyPayment').textContent = 
+                this.calculator.formatCurrency(results.purchase.financing.monthlyPayment);
+            document.getElementById('financingTotalInterest').textContent = 
+                this.calculator.formatCurrency(results.purchase.financing.totalInterest);
+            document.getElementById('financingTotalCost').textContent = 
+                this.calculator.formatCurrency(results.purchase.financing.totalFinancedCost);
+        } else {
+            financingKpis.style.display = 'none';
+        }
+        
         // Recommendation
         const recommendation = document.getElementById('recommendation');
+        const purchaseLabel = results.purchase.financing ? 'COMPRAR (financiado)' : 'COMPRAR';
         if (results.bestOption === 'purchase') {
             recommendation.className = 'recommendation best-purchase';
-            recommendation.textContent = `💰 Recomendación: COMPRAR es más económico. Ahorro: ${this.calculator.formatCurrency(Math.abs(results.difference))}`;
+            recommendation.textContent = `💰 Recomendación: ${purchaseLabel} es más económico. Ahorro: ${this.calculator.formatCurrency(Math.abs(results.difference))}`;
         } else {
             recommendation.className = 'recommendation best-renting';
             recommendation.textContent = `🚗 Recomendación: ${results.optimal.contract.label} es más económico. Ahorro: ${this.calculator.formatCurrency(results.difference)}`;
@@ -557,8 +672,9 @@ class UIController {
         }
         
         // Convert to positive values (CPN = Net Present Cost)
+        const purchaseLabel = results.purchase.financing ? 'Comprar (Financiado)' : 'Comprar';
         const data = [
-            { label: 'Comprar', value: Math.abs(results.purchase.npv), color: '#f5576c' },
+            { label: purchaseLabel, value: Math.abs(results.purchase.npv), color: results.purchase.financing ? '#764ba2' : '#f5576c' },
             ...results.renting.map(r => ({
                 label: r.contract.label,
                 value: Math.abs(r.npv),
@@ -1343,12 +1459,18 @@ class UIController {
 
     showDetailsTable(results) {
         const container = document.getElementById('detailsTable');
+        const hasFinancing = results.purchase.financing !== null;
         
         let html = '<table><thead><tr>';
         html += '<th>Mes</th>';
         html += '<th>Compra</th>';
         html += '<th>Combustible</th>';
         html += '<th>Mantenimiento</th>';
+        if (hasFinancing) {
+            html += '<th>Cuota Préstamo</th>';
+            html += '<th>Principal</th>';
+            html += '<th>Intereses</th>';
+        }
         html += '<th>Residual</th>';
         html += '<th>VP</th>';
         html += '<th>Renting</th>';
@@ -1371,10 +1493,16 @@ class UIController {
                 html += `<td>${this.calculator.formatCurrency(pCF.amount)}</td>`;
                 html += `<td>${this.calculator.formatCurrency(pCF.fuel || 0)}</td>`;
                 html += `<td>${this.calculator.formatCurrency(pCF.maintenance || 0)}</td>`;
+                if (hasFinancing) {
+                    html += `<td>${this.calculator.formatCurrency(pCF.loanPayment || 0)}</td>`;
+                    html += `<td>${this.calculator.formatCurrency(pCF.loanPrincipal || 0)}</td>`;
+                    html += `<td>${this.calculator.formatCurrency(pCF.loanInterest || 0)}</td>`;
+                }
                 html += `<td>${this.calculator.formatCurrency(pCF.residual || 0)}</td>`;
                 html += `<td>${this.calculator.formatCurrency(pCF.pv)}</td>`;
             } else {
-                html += '<td></td><td></td><td></td><td></td><td></td>';
+                const emptyCols = hasFinancing ? 8 : 5;
+                html += '<td></td>'.repeat(emptyCols);
             }
             
             if (rCF) {
