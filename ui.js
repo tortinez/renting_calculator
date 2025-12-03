@@ -678,7 +678,7 @@ class UIController {
             ...results.renting.map(r => ({
                 label: r.contract.label,
                 value: Math.abs(r.npv),
-                color: r.contract.id === results.optimal.contract.id ? '#F57C00' : '#1976D2'
+                color: r.contract.id === results.optimal.contract.id ? '#43A047' : '#1976D2'
             }))
         ];
         
