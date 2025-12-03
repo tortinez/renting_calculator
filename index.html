@@ -80,6 +80,41 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Financing Section -->
+                        <div class="financing-section">
+                            <div class="form-group financing-toggle">
+                                <label>
+                                    <input type="checkbox" id="financingEnabled">
+                                    💳 Financiar el vehículo
+                                </label>
+                                <span class="help-text">Simular compra con préstamo en lugar de pago al contado</span>
+                            </div>
+                            <div id="financingInputs" class="financing-inputs" style="display: none;">
+                                <div class="form-group">
+                                    <label for="downPayment">Entrada inicial:</label>
+                                    <input type="number" id="downPayment" value="0" min="0" step="500">
+                                    <span class="unit">€</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="loanTermMonths">Plazo del préstamo:</label>
+                                    <input type="number" id="loanTermMonths" value="60" min="6" max="120" step="6">
+                                    <span class="unit">meses</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="annualInterestRate">TAE (interés anual):</label>
+                                    <input type="number" id="annualInterestRate" value="7" min="0" max="30" step="0.1">
+                                    <span class="unit">%</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="balloonPayment">Cuota final (balloon):</label>
+                                    <input type="number" id="balloonPayment" value="0" min="0" step="500">
+                                    <span class="unit">€</span>
+                                    <span class="help-text">Pago adicional al final del plazo (opcional)</span>
+                                </div>
+                                <div id="financingSummary" class="financing-summary"></div>
+                            </div>
+                        </div>
                     </div>
                 </details>
 
@@ -160,6 +195,31 @@
                     <div class="npc-explanation">
                         <p><strong>ℹ️ Sobre el Coste Presente Neto (CPN):</strong> El CPN representa el coste total de todos los pagos futuros, traídos a valor presente. Se muestra como valor positivo para facilitar la comparación: <strong>menor CPN = opción más económica</strong>.</p>
                     </div>
+                    
+                    <!-- Financing KPIs (shown when financing is enabled) -->
+                    <div id="financingKpis" class="financing-kpis" style="display: none;">
+                        <div class="kpi-section-header">
+                            <h3>💳 Resumen de Financiación</h3>
+                        </div>
+                        <div class="kpis-grid financing-kpi-grid">
+                            <div class="kpi-card financing-card">
+                                <h3>Cuota Mensual</h3>
+                                <div class="kpi-value" id="financingMonthlyPayment">—</div>
+                                <div class="kpi-label">€/mes</div>
+                            </div>
+                            <div class="kpi-card financing-card">
+                                <h3>Total Intereses</h3>
+                                <div class="kpi-value" id="financingTotalInterest">—</div>
+                                <div class="kpi-label">€</div>
+                            </div>
+                            <div class="kpi-card financing-card">
+                                <h3>Coste Total Financiado</h3>
+                                <div class="kpi-value" id="financingTotalCost">—</div>
+                                <div class="kpi-label">€</div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="kpis-grid primary-kpis">
                         <div class="kpi-card purchase">
                             <h3>Comprar</h3>

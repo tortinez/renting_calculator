@@ -11,6 +11,14 @@ class DCFCalculator {
             purchasePrice: 33000,
             ownershipCosts: 1200,
             fuelCost: 0.104,
+            financing: {
+                enabled: false,
+                loanAmount: null, // defaults to purchasePrice - downPayment
+                downPayment: 0,
+                termMonths: 60,
+                annualInterestRate: 0.07, // TAE 7%
+                balloonPayment: 0
+            },
             residualAnchors: [
                 { year: 0, fraction: 1.0 },
                 { year: 5, fraction: 0.35 },
@@ -117,6 +125,93 @@ class DCFCalculator {
         return Math.max(0, annualKm);
     }
 
+    // Calculate monthly loan payment using standard amortization formula
+    // r = (1 + TAE)^(1/12) - 1
+    // payment = principal * r / (1 - (1 + r)^(-term))
+    calculateMonthlyLoanPayment(principal, annualRate, termMonths) {
+        if (principal <= 0 || termMonths <= 0) return 0;
+        if (annualRate <= 0) return principal / termMonths; // No interest case
+        
+        const monthlyRate = this.annualToMonthlyRate(annualRate);
+        const payment = principal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -termMonths));
+        return payment;
+    }
+
+    // Generate loan amortization schedule with principal/interest split
+    generateLoanSchedule(loanAmount, annualRate, termMonths, balloonPayment = 0) {
+        const schedule = [];
+        
+        if (loanAmount <= 0 || termMonths <= 0) {
+            return schedule;
+        }
+        
+        // Adjust principal for balloon payment
+        // For balloon loans, reduce principal so regular payments are smaller
+        const adjustedPrincipal = balloonPayment > 0 ? loanAmount - balloonPayment : loanAmount;
+        const monthlyPayment = this.calculateMonthlyLoanPayment(adjustedPrincipal, annualRate, termMonths);
+        const monthlyRate = annualRate <= 0 ? 0 : this.annualToMonthlyRate(annualRate);
+        
+        let remainingBalance = loanAmount;
+        
+        for (let month = 1; month <= termMonths; month++) {
+            const interestPayment = remainingBalance * monthlyRate;
+            let principalPayment = monthlyPayment - interestPayment;
+            let totalPayment = monthlyPayment;
+            
+            // Last month: add balloon payment if any
+            if (month === termMonths && balloonPayment > 0) {
+                principalPayment += balloonPayment;
+                totalPayment += balloonPayment;
+            }
+            
+            // Ensure we don't overpay
+            if (month === termMonths) {
+                principalPayment = remainingBalance;
+                totalPayment = principalPayment + interestPayment;
+            }
+            
+            schedule.push({
+                month: month,
+                payment: totalPayment,
+                principal: principalPayment,
+                interest: interestPayment,
+                remainingBalance: Math.max(0, remainingBalance - principalPayment)
+            });
+            
+            remainingBalance -= principalPayment;
+        }
+        
+        return schedule;
+    }
+
+    // Calculate financing summary
+    calculateFinancingSummary(financing, purchasePrice) {
+        const downPayment = financing.downPayment || 0;
+        const loanAmount = financing.loanAmount !== null ? financing.loanAmount : (purchasePrice - downPayment);
+        const termMonths = financing.termMonths || 60;
+        const annualRate = financing.annualInterestRate || 0.07;
+        const balloonPayment = financing.balloonPayment || 0;
+        
+        const schedule = this.generateLoanSchedule(loanAmount, annualRate, termMonths, balloonPayment);
+        
+        const totalPayments = schedule.reduce((sum, s) => sum + s.payment, 0);
+        const totalInterest = schedule.reduce((sum, s) => sum + s.interest, 0);
+        const monthlyPayment = schedule.length > 0 ? schedule[0].payment : 0;
+        
+        return {
+            loanAmount: loanAmount,
+            downPayment: downPayment,
+            termMonths: termMonths,
+            annualInterestRate: annualRate,
+            balloonPayment: balloonPayment,
+            monthlyPayment: monthlyPayment,
+            totalPayments: totalPayments,
+            totalInterest: totalInterest,
+            totalFinancedCost: downPayment + totalPayments,
+            schedule: schedule
+        };
+    }
+
     // Build purchase cash flows (monthly)
     buildPurchaseCashFlows(months, kmPerYear, inputs) {
         const monthlyDiscountRate = this.annualToMonthlyRate(inputs.discountRate);
@@ -124,31 +219,82 @@ class DCFCalculator {
         
         const cashFlows = [];
         
-        // Initial purchase (month 0)
-        cashFlows.push({
-            month: 0,
-            amount: -inputs.purchasePrice,
-            description: 'Compra inicial',
-            pv: -inputs.purchasePrice
-        });
+        // Check if financing is enabled
+        const financingEnabled = inputs.financing && inputs.financing.enabled;
+        let financingSummary = null;
         
-        // Monthly operating costs
+        if (financingEnabled) {
+            financingSummary = this.calculateFinancingSummary(inputs.financing, inputs.purchasePrice);
+            
+            // Down payment at month 0 (if any)
+            if (financingSummary.downPayment > 0) {
+                cashFlows.push({
+                    month: 0,
+                    amount: -financingSummary.downPayment,
+                    description: 'Entrada inicial',
+                    downPayment: financingSummary.downPayment,
+                    pv: -financingSummary.downPayment
+                });
+            } else {
+                // Empty month 0 for consistency
+                cashFlows.push({
+                    month: 0,
+                    amount: 0,
+                    description: 'Inicio financiación',
+                    pv: 0
+                });
+            }
+        } else {
+            // Initial purchase (month 0) - full payment upfront
+            cashFlows.push({
+                month: 0,
+                amount: -inputs.purchasePrice,
+                description: 'Compra inicial',
+                pv: -inputs.purchasePrice
+            });
+        }
+        
+        // Monthly operating costs (and loan payments if financing)
         for (let m = 1; m <= months; m++) {
             const kmMonth = kmPerYear / 12;
             const fuelCost = inputs.fuelCost * kmMonth * Math.pow(1 + monthlyInflationRate, m - 1);
             const maintenanceCost = (inputs.ownershipCosts / 12) * Math.pow(1 + monthlyInflationRate, m - 1);
             
-            const totalCost = fuelCost + maintenanceCost;
+            let totalCost = fuelCost + maintenanceCost;
+            let loanPayment = 0;
+            let loanPrincipal = 0;
+            let loanInterest = 0;
+            
+            // Add loan payment if within financing term
+            if (financingEnabled && financingSummary && m <= financingSummary.termMonths) {
+                const scheduleEntry = financingSummary.schedule[m - 1];
+                if (scheduleEntry) {
+                    loanPayment = scheduleEntry.payment;
+                    loanPrincipal = scheduleEntry.principal;
+                    loanInterest = scheduleEntry.interest;
+                    totalCost += loanPayment;
+                }
+            }
+            
             const pv = -totalCost / Math.pow(1 + monthlyDiscountRate, m);
             
-            cashFlows.push({
+            const cfEntry = {
                 month: m,
                 amount: -totalCost,
                 fuel: fuelCost,
                 maintenance: maintenanceCost,
                 description: `Mes ${m}`,
                 pv: pv
-            });
+            };
+            
+            // Add financing details if present
+            if (financingEnabled && loanPayment > 0) {
+                cfEntry.loanPayment = loanPayment;
+                cfEntry.loanPrincipal = loanPrincipal;
+                cfEntry.loanInterest = loanInterest;
+            }
+            
+            cashFlows.push(cfEntry);
         }
         
         // Residual value at end
@@ -231,6 +377,12 @@ class DCFCalculator {
         const purchaseNPV = this.calculateNPV(purchaseCF);
         const purchaseTotal = this.calculateTotalNominal(purchaseCF);
         
+        // Calculate financing summary if enabled
+        let financingSummary = null;
+        if (inputs.financing && inputs.financing.enabled) {
+            financingSummary = this.calculateFinancingSummary(inputs.financing, inputs.purchasePrice);
+        }
+        
         // Calculate renting options
         const rentingResults = inputs.contracts.map(contract => {
             const rentCF = this.buildRentingCashFlows(inputs.months, kmPerYear, contract, inputs);
@@ -269,7 +421,8 @@ class DCFCalculator {
             purchase: {
                 cashFlows: purchaseCF,
                 npv: purchaseNPV,
-                totalNominal: purchaseTotal
+                totalNominal: purchaseTotal,
+                financing: financingSummary
             },
             renting: rentingResults,
             optimal: optimalRenting,
@@ -419,8 +572,14 @@ class DCFCalculator {
             return '';
         }
         
-        let csv = 'Mes,Compra,Compra Combustible,Compra Mantenimiento,Compra Residual,';
-        csv += 'Renting Optimo,Renting Cuota,Renting Combustible,Renting Penalizacion\n';
+        // Check if financing is enabled
+        const hasFinancing = this.results.purchase.financing !== null;
+        
+        let csv = 'Mes,Compra,Compra Combustible,Compra Mantenimiento,Compra Residual';
+        if (hasFinancing) {
+            csv += ',Cuota Préstamo,Principal,Intereses';
+        }
+        csv += ',Renting Optimo,Renting Cuota,Renting Combustible,Renting Penalizacion\n';
         
         const maxLength = Math.max(
             this.results.purchase.cashFlows.length,
@@ -437,9 +596,15 @@ class DCFCalculator {
                 csv += `${purchaseCF.amount},`;
                 csv += `${purchaseCF.fuel || 0},`;
                 csv += `${purchaseCF.maintenance || 0},`;
-                csv += `${purchaseCF.residual || 0},`;
+                csv += `${purchaseCF.residual || 0}`;
+                if (hasFinancing) {
+                    csv += `,${purchaseCF.loanPayment || 0}`;
+                    csv += `,${purchaseCF.loanPrincipal || 0}`;
+                    csv += `,${purchaseCF.loanInterest || 0}`;
+                }
+                csv += ',';
             } else {
-                csv += ',,,,';
+                csv += hasFinancing ? ',,,,,,,,' : ',,,,';
             }
             
             if (rentingCF) {
@@ -457,14 +622,31 @@ class DCFCalculator {
 
     // Export to JSON
     exportToJSON() {
+        const purchaseData = {
+            npv: this.results.purchase.npv,
+            totalNominal: this.results.purchase.totalNominal
+        };
+        
+        // Include financing summary if available
+        if (this.results.purchase.financing) {
+            purchaseData.financing = {
+                loanAmount: this.results.purchase.financing.loanAmount,
+                downPayment: this.results.purchase.financing.downPayment,
+                termMonths: this.results.purchase.financing.termMonths,
+                annualInterestRate: this.results.purchase.financing.annualInterestRate,
+                balloonPayment: this.results.purchase.financing.balloonPayment,
+                monthlyPayment: this.results.purchase.financing.monthlyPayment,
+                totalPayments: this.results.purchase.financing.totalPayments,
+                totalInterest: this.results.purchase.financing.totalInterest,
+                totalFinancedCost: this.results.purchase.financing.totalFinancedCost
+            };
+        }
+        
         return JSON.stringify({
             inputs: this.inputs,
             results: {
                 kmPerYear: this.results.kmPerYear,
-                purchase: {
-                    npv: this.results.purchase.npv,
-                    totalNominal: this.results.purchase.totalNominal
-                },
+                purchase: purchaseData,
                 optimal: {
                     contract: this.results.optimal.contract,
                     npv: this.results.optimal.npv,
