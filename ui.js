@@ -36,6 +36,7 @@ class UIController {
         this.renderWeeklyPlanner();
         this.renderOneOffTrips();
         this.renderCustomWeeks();
+        this.renderResidualAnchors();
         this.syncInputsToUI();
         this.setupFinancingUI();
     }
@@ -185,6 +186,15 @@ class UIController {
         // Add renting contract
         document.getElementById('addContractBtn').addEventListener('click', () => {
             this.addRentingContract();
+        });
+
+        // Add residual anchor button
+        document.getElementById('addResidualAnchorBtn').addEventListener('click', () => {
+            // Find the maximum year in existing anchors
+            const maxYear = Math.max(...this.currentInputs.residualAnchors.map(a => a.year));
+            this.currentInputs.residualAnchors.push({ year: maxYear + 1, fraction: 0.1 });
+            this.renderResidualAnchors();
+            this.saveToLocalStorage();
         });
 
         // Input changes for annual km update
@@ -565,6 +575,90 @@ class UIController {
             div.appendChild(labelInput);
             div.appendChild(weeksInput);
             div.appendChild(multInput);
+            div.appendChild(removeBtn);
+
+            container.appendChild(div);
+        });
+    }
+
+    renderResidualAnchors() {
+        const container = document.getElementById('residualAnchors');
+        container.innerHTML = '';
+
+        // Sort anchors by year
+        const sortedAnchors = [...this.currentInputs.residualAnchors].sort((a, b) => a.year - b.year);
+
+        sortedAnchors.forEach((anchor, idx) => {
+            const div = document.createElement('div');
+            div.className = 'residual-anchor-entry';
+
+            const yearLabel = document.createElement('span');
+            yearLabel.className = 'residual-label';
+            yearLabel.textContent = 'Año';
+
+            const yearInput = document.createElement('input');
+            yearInput.type = 'number';
+            yearInput.value = anchor.year;
+            yearInput.min = '0';
+            yearInput.max = '20';
+            yearInput.step = '1';
+            yearInput.placeholder = 'Año';
+            yearInput.className = 'residual-year-input';
+            yearInput.onchange = (e) => {
+                const originalIdx = this.currentInputs.residualAnchors.findIndex(
+                    a => a.year === anchor.year && a.fraction === anchor.fraction
+                );
+                if (originalIdx !== -1) {
+                    this.currentInputs.residualAnchors[originalIdx].year = parseFloat(e.target.value) || 0;
+                    this.saveToLocalStorage();
+                    this.renderResidualAnchors();
+                }
+            };
+
+            const fractionInput = document.createElement('input');
+            fractionInput.type = 'number';
+            fractionInput.value = Math.round(anchor.fraction * 100);
+            fractionInput.min = '0';
+            fractionInput.max = '100';
+            fractionInput.step = '1';
+            fractionInput.placeholder = '%';
+            fractionInput.className = 'residual-fraction-input';
+            fractionInput.onchange = (e) => {
+                const originalIdx = this.currentInputs.residualAnchors.findIndex(
+                    a => a.year === anchor.year && a.fraction === anchor.fraction
+                );
+                if (originalIdx !== -1) {
+                    this.currentInputs.residualAnchors[originalIdx].fraction = (parseFloat(e.target.value) || 0) / 100;
+                    this.saveToLocalStorage();
+                }
+            };
+
+            const fractionLabel = document.createElement('span');
+            fractionLabel.className = 'unit';
+            fractionLabel.textContent = '%';
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'btn-remove-anchor';
+            removeBtn.textContent = '✕';
+            removeBtn.title = 'Eliminar punto';
+            // Don't allow removing if only 2 anchors left (minimum for interpolation)
+            removeBtn.disabled = this.currentInputs.residualAnchors.length <= 2;
+            removeBtn.onclick = () => {
+                if (this.currentInputs.residualAnchors.length <= 2) return;
+                const originalIdx = this.currentInputs.residualAnchors.findIndex(
+                    a => a.year === anchor.year && a.fraction === anchor.fraction
+                );
+                if (originalIdx !== -1) {
+                    this.currentInputs.residualAnchors.splice(originalIdx, 1);
+                    this.renderResidualAnchors();
+                    this.saveToLocalStorage();
+                }
+            };
+
+            div.appendChild(yearLabel);
+            div.appendChild(yearInput);
+            div.appendChild(fractionInput);
+            div.appendChild(fractionLabel);
             div.appendChild(removeBtn);
 
             container.appendChild(div);
@@ -1577,6 +1671,7 @@ class UIController {
                 this.renderWeeklyPlanner();
                 this.renderOneOffTrips();
                 this.renderCustomWeeks();
+                this.renderResidualAnchors();
                 this.updateAnnualKm();
             }
         } catch (e) {
@@ -1594,6 +1689,7 @@ class UIController {
             this.renderOneOffTrips();
             this.renderCustomWeeks();
             this.renderRentingContracts();
+            this.renderResidualAnchors();
             this.updateAnnualKm();
         }
     }

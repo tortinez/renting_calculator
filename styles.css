@@ -225,6 +225,60 @@ body {
     border-bottom: none;
 }
 
+/* Residual Anchor Entry */
+.residual-anchor-entry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.residual-anchor-entry:last-child {
+    border-bottom: none;
+}
+
+.residual-label {
+    font-weight: 600;
+    color: #555;
+    min-width: 30px;
+}
+
+.residual-year-input {
+    width: 60px;
+    padding: 6px;
+    border: 2px solid #e0e0e0;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.residual-fraction-input {
+    width: 60px;
+    padding: 6px;
+    border: 2px solid #e0e0e0;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+.btn-remove-anchor {
+    background: transparent;
+    border: none;
+    color: var(--danger-color);
+    font-size: 1em;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.btn-remove-anchor:disabled {
+    color: #ccc;
+    cursor: not-allowed;
+}
+
+.residual-add-btn {
+    width: 100%;
+    margin-top: 10px;
+}
+
 /* Financing Section */
 .financing-section {
     margin-top: 15px;
