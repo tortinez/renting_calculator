@@ -625,7 +625,7 @@ class UIController {
             fractionInput.className = 'residual-fraction-input';
             fractionInput.onchange = (e) => {
                 const originalIdx = this.currentInputs.residualAnchors.findIndex(
-                    a => a.year === anchor.year
+                    a => a.year === anchor.year && a.fraction === anchor.fraction
                 );
                 if (originalIdx !== -1) {
                     this.currentInputs.residualAnchors[originalIdx].fraction = (parseFloat(e.target.value) || 0) / 100;
@@ -646,7 +646,7 @@ class UIController {
             removeBtn.onclick = () => {
                 if (this.currentInputs.residualAnchors.length <= 2) return;
                 const originalIdx = this.currentInputs.residualAnchors.findIndex(
-                    a => a.year === anchor.year
+                    a => a.year === anchor.year && a.fraction === anchor.fraction
                 );
                 if (originalIdx !== -1) {
                     this.currentInputs.residualAnchors.splice(originalIdx, 1);
